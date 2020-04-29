@@ -45,6 +45,11 @@ func Visit(node Node, visit func(node Node) error) error {
 				}
 			}
 		}
+	case *Entry:
+		if node.Attribute != nil {
+			return Visit(node.Attribute, visit)
+		}
+		return Visit(node.Block, visit)
 	default:
 		panic(fmt.Sprintf("%T", node))
 	}

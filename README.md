@@ -12,3 +12,17 @@ and `json.Unmarshaler`.
 
 It is HCL1 compatible and does not support any HCL2 specific features.
 
+## Design
+
+Marshalling, unmarshalling, parsing and serialisation are all structurally
+isomorphic operations. That is, HCL can be deserialised into an AST or Go, 
+or vice versa, and the structure on both ends will be identical.
+
+HCL is always parsed into an AST before unmarshaling and, similarly, Go structures
+are always mapped to an AST before being serialised to HCL.
+
+Between          | And          | Preserves
+-----------------|--------------|-----------------
+HCL              | AST          | Structure, values, order, comments.
+HCL              | Go           | Structure, values.
+AST              | Go           | Structure, values.

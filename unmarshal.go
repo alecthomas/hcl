@@ -23,7 +23,7 @@ func Unmarshal(data []byte, v interface{}) error {
 	return UnmarshalAST(ast, v)
 }
 
-// Unmarshal an already parsed AST into a Go struct.
+// UnmarshalAST unmarshals an already parsed or constructed AST into a Go struct.
 func UnmarshalAST(ast *AST, v interface{}) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr {
@@ -58,7 +58,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 	}
 	// Apply HCL entries to our fields.
 	for _, field := range fields {
-		tag := parseTag(v.Type(), field.t)
+		tag := parseTag(v.Type(), field.t) // nolint: govet
 		if tag.name == "" {
 			continue
 		}
@@ -116,6 +116,15 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 			}
 		}
 
+		// Field is a pointer, create value if necessary, then move field down.
+		if field.v.Kind() == reflect.Ptr {
+			if field.v.IsNil() {
+				field.v.Set(reflect.New(field.v.Type().Elem()))
+			}
+			field.v = field.v.Elem()
+			field.t.Type = field.t.Type.Elem()
+		}
+
 		switch field.v.Kind() {
 		case reflect.Struct:
 			if len(entries) > 0 {
@@ -131,23 +140,34 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 
 		case reflect.Slice:
 			// Slice of blocks.
-			if field.v.Type().Elem().Kind() == reflect.Struct {
+			ptr := false
+			elt := field.v.Type().Elem()
+			if elt.Kind() == reflect.Ptr {
+				elt = elt.Elem()
+				ptr = true
+			}
+
+			if elt.Kind() == reflect.Struct {
 				mentries[field.t.Name] = nil
 				entries = append([]*Entry{entry}, entries...)
 				for _, entry := range entries {
 					if entry.Attribute != nil {
 						return fmt.Errorf("%s: expected a block for %q but got an attribute", entry.Pos, tag.name)
 					}
-					el := reflect.New(field.v.Type().Elem()).Elem()
+					el := reflect.New(elt).Elem()
 					err := unmarshalBlock(el, entry.Block)
 					if err != nil {
 						return fmt.Errorf("%s: %s", entry.Pos, err)
+					}
+					if ptr {
+						el = el.Addr()
 					}
 					field.v.Set(reflect.Append(field.v, el))
 				}
 				continue
 			}
 			fallthrough
+
 		default:
 			// Anything else must be a scalar value.
 			if len(entries) > 0 {
@@ -181,7 +201,7 @@ func unmarshalBlock(v reflect.Value, block *Block) error {
 	}
 	labels := block.Labels
 	for _, field := range fields {
-		tag := parseTag(v.Type(), field.t)
+		tag := parseTag(v.Type(), field.t) // nolint: govet
 		if tag.name == "" || !tag.label {
 			continue
 		}
@@ -210,22 +230,25 @@ func unmarshalValue(rv reflect.Value, v *Value) error {
 		rv.SetString(*v.Str)
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if v.Num == nil {
+		if v.Number == nil {
 			return fmt.Errorf("expected a number but got %s", v)
 		}
-		rv.SetInt(int64(*v.Num))
+		n, _ := v.Number.Int64()
+		rv.SetInt(n)
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		if v.Num == nil {
+		if v.Number == nil {
 			return fmt.Errorf("expected a number but got %s", v)
 		}
-		rv.SetUint(uint64(*v.Num))
+		n, _ := v.Number.Uint64()
+		rv.SetUint(n)
 
 	case reflect.Float32, reflect.Float64:
-		if v.Num == nil {
+		if v.Number == nil {
 			return fmt.Errorf("expected a number but got %s", v)
 		}
-		rv.SetFloat(*v.Num)
+		n, _ := v.Number.Float64()
+		rv.SetFloat(n)
 
 	case reflect.Map:
 		if v.Map == nil {
@@ -262,6 +285,13 @@ func unmarshalValue(rv reflect.Value, v *Value) error {
 			lv = reflect.Append(lv, value)
 		}
 		rv.Set(lv)
+
+	case reflect.Ptr:
+		if rv.IsNil() {
+			pv := reflect.New(rv.Type().Elem())
+			rv.Set(pv)
+		}
+		return unmarshalValue(rv.Elem(), v)
 
 	default:
 		panic(rv.Kind().String())

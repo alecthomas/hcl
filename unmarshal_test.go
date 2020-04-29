@@ -244,6 +244,51 @@ func TestUnmarshal(t *testing.T) {
 				Number: 1,
 			},
 		},
+		{name: "PointerScalars",
+			hcl: `
+				ptr = "one"
+			`,
+			dest: struct {
+				Ptr *string `hcl:"ptr"`
+			}{Ptr: strp("one")},
+		},
+		{name: "PointerList",
+			hcl: `
+				list = [1, 2]
+			`,
+			dest: struct {
+				List *[]int `hcl:"list"`
+			}{
+				List: intlistp(1, 2),
+			},
+		},
+		{name: "BlockPointer",
+			hcl: `
+				block {
+					str = "str"
+				}
+			`,
+			dest: struct {
+				Block *strBlock `hcl:"block,block"`
+			}{
+				Block: &strBlock{Str: "str"},
+			},
+		},
+		{name: "BlockSliceOfPointers",
+			hcl: `
+				block {
+					str = "foo"
+				}
+				block {
+					str = "bar"
+				}
+			`,
+			dest: struct {
+				Block []*strBlock `hcl:"block,block"`
+			}{
+				Block: []*strBlock{{Str: "foo"}, {Str: "bar"}},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -259,6 +304,10 @@ func TestUnmarshal(t *testing.T) {
 		})
 	}
 }
+
+func intlistp(i ...int) *[]int { return &i }
+
+func strp(s string) *string { return &s }
 
 const complexHCLExample = `
 aws {
@@ -305,9 +354,9 @@ type AWS struct {
 }
 type Rule struct {
 	Target       string   `hcl:"target,label"`
+	Services     []string `hcl:"services,optional"`
 	Users        []string `hcl:"users,optional"`
 	Capabilities []string `hcl:"capabilities,optional"`
-	Services     []string `hcl:"services,optional"`
 }
 type ACL struct {
 	GET    []Rule `hcl:"get,block"`

@@ -6,6 +6,7 @@ package hcl
 import (
 	"fmt"
 	"io"
+	"math/big"
 	"strings"
 
 	"github.com/alecthomas/participle"
@@ -13,6 +14,7 @@ import (
 	"github.com/alecthomas/participle/lexer/regex"
 )
 
+// Node is the the interface implemented by all AST nodes.
 type Node interface{ node() }
 
 // AST for HCL.
@@ -24,6 +26,7 @@ type AST struct {
 
 func (*AST) node() {}
 
+// Entry at the top-level of a HCL file or block.
 type Entry struct {
 	Pos lexer.Position
 
@@ -49,6 +52,7 @@ func (e *Entry) Key() string {
 	}
 }
 
+// Attribute is a key+value attribute.
 type Attribute struct {
 	Pos lexer.Position
 
@@ -62,6 +66,7 @@ func (a *Attribute) String() string {
 	return fmt.Sprintf("%s = %s", a.Key, a.Value)
 }
 
+// Block represents am optionally labelled HCL block.
 type Block struct {
 	Pos lexer.Position
 
@@ -72,6 +77,7 @@ type Block struct {
 
 func (*Block) node() {}
 
+// MapEntry represents a key+value in a map.
 type MapEntry struct {
 	Pos lexer.Position
 
@@ -83,20 +89,22 @@ type MapEntry struct {
 
 func (*MapEntry) node() {}
 
+// Bool represents a parsed boolean value.
 type Bool bool
 
-func (b *Bool) Capture(values []string) error { *b = values[0] == "true"; return nil }
+func (b *Bool) Capture(values []string) error { *b = values[0] == "true"; return nil } // nolint: golint
 
+// Value is a scalar, list or map.
 type Value struct {
 	Pos lexer.Position
 
 	Comments []string `@Comment*`
 
-	Bool *Bool       `(  @("true" | "false")`
-	Num  *float64    ` | @Number`
-	Str  *string     ` | @String`
-	List []*Value    ` | "[" ( @@ ( "," @@ )* )? ","? "]"`
-	Map  []*MapEntry ` | "{" ( @@ ( "," @@ )* ","? )? "}" )`
+	Bool   *Bool       `(  @("true" | "false")`
+	Number *big.Float  ` | @Number`
+	Str    *string     ` | @String`
+	List   []*Value    ` | "[" ( @@ ( "," @@ )* )? ","? "]"`
+	Map    []*MapEntry ` | "{" ( @@ ( "," @@ )* ","? )? "}" )`
 }
 
 func (*Value) node() {}
@@ -105,8 +113,8 @@ func (v *Value) String() string {
 	switch {
 	case v.Bool != nil:
 		return fmt.Sprintf("%v", *v.Bool)
-	case v.Num != nil:
-		return fmt.Sprintf("%g", *v.Num)
+	case v.Number != nil:
+		return v.Number.String()
 	case v.Str != nil:
 		return fmt.Sprintf("%q", *v.Str)
 	case v.List != nil:
