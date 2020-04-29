@@ -42,6 +42,19 @@ func TestUnmarshal(t *testing.T) {
 		dest interface{}
 		fail string
 	}{
+		{name: "Embed",
+			hcl: `
+				str = "foo"
+				bar = "bar"
+			`,
+			dest: struct {
+				strBlock
+				Bar string `hcl:"bar"`
+			}{
+				strBlock: strBlock{"foo"},
+				Bar:      "bar",
+			},
+		},
 		{name: "MixedBlockAndAttribute",
 			hcl: `
 				name = "foo"
@@ -161,6 +174,17 @@ func TestUnmarshal(t *testing.T) {
 				Block labelledBlock `hcl:"block,block"`
 			}{},
 			fail: "2:5: missing label \"name\"",
+		},
+		{name: "TooManyLabels",
+			hcl: `
+				block "label0" "label1" {
+					attr = "foo"
+				}
+			`,
+			dest: struct {
+				Block labelledBlock `hcl:"block,block"`
+			}{},
+			fail: "2:5: too many labels for block \"block\"",
 		},
 		{name: "SliceOfBlocks",
 			hcl: `

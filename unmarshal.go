@@ -196,6 +196,9 @@ func unmarshalBlock(v reflect.Value, block *Block) error {
 		labels = labels[1:]
 		field.v.SetString(label)
 	}
+	if len(labels) > 0 {
+		return fmt.Errorf("too many labels for block %q", block.Name)
+	}
 	return unmarshalEntries(v, block.Body)
 }
 
@@ -309,9 +312,9 @@ func parseTag(parent reflect.Type, t reflect.StructField) tag {
 	s, ok := t.Tag.Lookup("hcl")
 	if !ok {
 		s, ok = t.Tag.Lookup("json")
-		if ok {
+		if !ok {
+			return tag{name: t.Name}
 		}
-		return tag{name: t.Name}
 	}
 	parts := strings.Split(s, ",")
 	name := parts[0]
