@@ -154,7 +154,6 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 				return fmt.Errorf("%s: duplicate field %q at %s", entry.Pos, entry.Key(), entries[0].Pos)
 			}
 			if entry.Block != nil {
-				fmt.Printf("%s\n", v.Type())
 				return fmt.Errorf("%s: expected an attribute for %q but got a block", entry.Pos, tag.name)
 			}
 			value := entry.Attribute.Value

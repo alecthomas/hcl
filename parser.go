@@ -13,6 +13,8 @@ import (
 	"github.com/alecthomas/participle/lexer/regex"
 )
 
+type Node interface{ node() }
+
 // AST for HCL.
 type AST struct {
 	Pos lexer.Position
@@ -20,22 +22,18 @@ type AST struct {
 	Entries []*Entry `@@*`
 }
 
-func (a *AST) String() string {
-	out := []string{}
-	for _, e := range a.Entries {
-		out = append(out, e.String())
-	}
-	return strings.Join(out, "\n")
-}
+func (*AST) node() {}
 
 type Entry struct {
 	Pos lexer.Position
 
-	Comment string `@Comment?`
+	Comments []string `@Comment*`
 
 	Attribute *Attribute `(   @@`
 	Block     *Block     `  | @@ )`
 }
+
+func (*Entry) node() {}
 
 // Key of the attribute or block.
 func (e *Entry) Key() string {
@@ -51,25 +49,14 @@ func (e *Entry) Key() string {
 	}
 }
 
-func (e *Entry) String() string {
-	switch {
-	case e.Attribute != nil:
-		return e.Attribute.String()
-
-	case e.Block != nil:
-		return e.Block.String()
-
-	default:
-		panic("???")
-	}
-}
-
 type Attribute struct {
 	Pos lexer.Position
 
 	Key   string `@Ident "="`
 	Value *Value `@@`
 }
+
+func (*Attribute) node() {}
 
 func (a *Attribute) String() string {
 	return fmt.Sprintf("%s = %s", a.Key, a.Value)
@@ -83,28 +70,18 @@ type Block struct {
 	Body   []*Entry `"{" @@* "}"`
 }
 
-func (b *Block) String() string {
-	w := &strings.Builder{}
-	fmt.Fprintf(w, "%s ", b.Name)
-	for _, label := range b.Labels {
-		fmt.Fprintf(w, "%q ", label)
-	}
-	fmt.Fprintln(w, "{")
-	for _, e := range b.Body {
-		fmt.Fprintln(w, e)
-	}
-	fmt.Fprintln(w, "}")
-	return w.String()
-}
+func (*Block) node() {}
 
 type MapEntry struct {
 	Pos lexer.Position
 
-	Comment string `@Comment?`
+	Comments []string `@Comment*`
 
 	Key   string `@(Ident | String) ":"`
 	Value *Value `@@`
 }
+
+func (*MapEntry) node() {}
 
 type Bool bool
 
@@ -113,7 +90,7 @@ func (b *Bool) Capture(values []string) error { *b = values[0] == "true"; return
 type Value struct {
 	Pos lexer.Position
 
-	Comment string `@Comment?`
+	Comments []string `@Comment*`
 
 	Bool *Bool       `(  @("true" | "false")`
 	Num  *float64    ` | @Number`
@@ -121,6 +98,8 @@ type Value struct {
 	List []*Value    ` | "[" ( @@ ( "," @@ )* )? ","? "]"`
 	Map  []*MapEntry ` | "{" ( @@ ( "," @@ )* ","? )? "}" )`
 }
+
+func (*Value) node() {}
 
 func (v *Value) String() string {
 	switch {
@@ -153,7 +132,7 @@ var (
 		Number = \b^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?\b
 		String = "(\\\d\d\d|\\.|[^"])*"
 		Punct = [][{}=:,]
-		Comment = //.*|/\*.*?\*/
+		Comment = //[^\n]*|/\*.*?\*/
 
 		whitespace = \s+
 	`))

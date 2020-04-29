@@ -21,8 +21,11 @@ func TestParse(t *testing.T) {
 				attr = true
 			`,
 			expected: hcl(&Entry{
-				Comment:   "// A comment",
-				Attribute: attr("attr", hbool(true)).Attribute,
+				Comments: []string{"// A comment"},
+				Attribute: &Attribute{
+					Key:   "attr",
+					Value: hbool(true),
+				},
 			}),
 		},
 		{name: "Attributes",
@@ -93,24 +96,6 @@ func TestParse(t *testing.T) {
 func hbool(b bool) *Value {
 	return &Value{Bool: (*Bool)(&b)}
 }
-
-// func TestString(t *testing.T) {
-// 	hcl := `
-// str = "string"
-// float = 1.234
-// list = [1, 2, 3]
-// map = {
-// 	"a": 1,
-// 	"b": "str"
-// }
-// block "label" {
-// 	attr = "yes"
-// }
-// `
-// 	ast, err := ParseString(hcl)
-// 	require.NoError(t, err)
-// 	require.Equal(t, strings.TrimSpace(hcl), strings.TrimSpace(ast.String()))
-// }
 
 func normaliseAST(hcl *AST) {
 	hcl.Pos = lexer.Position{}

@@ -260,8 +260,7 @@ func TestUnmarshal(t *testing.T) {
 	}
 }
 
-func TestUnmarshalComplex(t *testing.T) {
-	hcl := `
+const complexHCLExample = `
 aws {
   credentials-provider = "ROTATING_JSON"
 }
@@ -272,21 +271,26 @@ server {
       users = ["*"]
       capabilities = ["users_service_owners"]
     }
+
     grpc "/mycompany.service.UserService/UpgradeUser" {
       services = ["servicea", "serviceb"]
       users = ["*"]
       capabilities = ["users_service_owners"]
     }
+
+    // ACL for MergeUser.
     grpc "/mycompany.service.UserService/MergeUser" {
       services = ["servicea", "serviceb"]
       users = ["*"]
       capabilities = ["users_service_owners"]
     }
+
     grpc "/mycompany.service.UserService/AuthenticateUser" {
       services = ["servicea", "rewardly"]
       users = ["*"]
       capabilities = ["users_service_owners"]
     }
+
     grpc "/**" {
       services = ["servicea"]
       users = ["*"]
@@ -295,34 +299,37 @@ server {
   }
 }
 `
-	type AWS struct {
-		CredentialsProvider string `hcl:"credentials-provider"`
-	}
-	type Rule struct {
-		Target       string   `hcl:"target,label"`
-		Users        []string `hcl:"users,optional"`
-		Capabilities []string `hcl:"capabilities,optional"`
-		Services     []string `hcl:"services,optional"`
-	}
-	type ACL struct {
-		GET    []Rule `hcl:"get,block"`
-		POST   []Rule `hcl:"post,block"`
-		PUT    []Rule `hcl:"put,block"`
-		DELETE []Rule `hcl:"delete,block"`
-		GRPC   []Rule `hcl:"grpc,block"`
-	}
-	type Server struct {
-		ACL                         ACL     `hcl:"acl,block"`
-		CACert                      string  `hcl:"ca-cert,optional"`
-		KeyPair                     string  `hcl:"key-pair,optional"`
-		CycleConnectionsProbability float64 `hcl:"cycle-connections-probability,optional"`
-	}
-	type Config struct {
-		AWS    AWS    `hcl:"aws,block"`
-		Server Server `hcl:"server,block"`
-	}
+
+type AWS struct {
+	CredentialsProvider string `hcl:"credentials-provider"`
+}
+type Rule struct {
+	Target       string   `hcl:"target,label"`
+	Users        []string `hcl:"users,optional"`
+	Capabilities []string `hcl:"capabilities,optional"`
+	Services     []string `hcl:"services,optional"`
+}
+type ACL struct {
+	GET    []Rule `hcl:"get,block"`
+	POST   []Rule `hcl:"post,block"`
+	PUT    []Rule `hcl:"put,block"`
+	DELETE []Rule `hcl:"delete,block"`
+	GRPC   []Rule `hcl:"grpc,block"`
+}
+type Server struct {
+	ACL                         ACL     `hcl:"acl,block"`
+	CACert                      string  `hcl:"ca-cert,optional"`
+	KeyPair                     string  `hcl:"key-pair,optional"`
+	CycleConnectionsProbability float64 `hcl:"cycle-connections-probability,optional"`
+}
+type Config struct {
+	AWS    AWS    `hcl:"aws,block"`
+	Server Server `hcl:"server,block"`
+}
+
+func TestUnmarshalComplex(t *testing.T) {
 	config := Config{}
-	err := Unmarshal([]byte(hcl), &config)
+	err := Unmarshal([]byte(complexHCLExample), &config)
 	require.NoError(t, err)
 	expected := Config{
 		AWS: AWS{
