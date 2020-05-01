@@ -14,6 +14,9 @@ var (
 	textMarshalerInterface   = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
 	jsonUnmarshalerInterface = reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()
 	jsonMarshalerInterface   = reflect.TypeOf((*json.Marshaler)(nil)).Elem()
+	remainType               = reflect.TypeOf([]*Entry{})
+	durationType             = reflect.TypeOf(time.Duration(0))
+	timeType                 = reflect.TypeOf(time.Time{})
 )
 
 // Unmarshal HCL into a Go struct.
@@ -67,6 +70,17 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 		if tag.label {
 			delete(seen, tag.name)
 			continue
+		}
+		if tag.remain {
+			if field.t.Type != remainType {
+				panic(fmt.Sprintf("\"remain\" field %q must be of type []*hcl.Entry but is %T", field.t.Name, field.t.Type))
+			}
+			remaining := []*Entry{}
+			for _, entries := range mentries {
+				remaining = append(remaining, entries...)
+			}
+			field.v.Set(reflect.ValueOf(remaining))
+			return nil
 		}
 		haventSeen := !seen[tag.name]
 		entries := mentries[tag.name]
@@ -337,6 +351,7 @@ type tag struct {
 	optional bool
 	label    bool
 	block    bool
+	remain   bool
 }
 
 func parseTag(parent reflect.Type, t reflect.StructField) tag {
@@ -367,6 +382,8 @@ func parseTag(parent reflect.Type, t reflect.StructField) tag {
 		return tag{name: name, label: true}
 	case "block":
 		return tag{name: name, block: true, optional: true}
+	case "remain":
+		return tag{name: name, remain: true}
 	default:
 		panic("invalid HCL tag option " + option + " on " + id)
 	}

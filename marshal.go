@@ -108,29 +108,29 @@ func fieldToAttr(field field, tag tag) (*Attribute, error) {
 }
 
 func valueToValue(v reflect.Value) (*Value, error) {
-	if v.Type() == reflect.TypeOf(time.Duration(0)) {
+	// Special cased types.
+	t := v.Type()
+	if t == durationType {
 		s := v.Interface().(time.Duration).String()
 		return &Value{Str: &s}, nil
-	}
-	if v, ok := implements(v, textMarshalerInterface); ok {
-		v := v.Interface().(encoding.TextMarshaler)
-		b, err := v.MarshalText()
+	} else if uv, ok := implements(v, textMarshalerInterface); ok {
+		tm := uv.Interface().(encoding.TextMarshaler)
+		b, err := tm.MarshalText()
+		if err != nil {
+			return nil, err
+		}
+		s := string(b)
+		return &Value{Str: &s}, nil
+	} else if uv, ok := implements(v, jsonMarshalerInterface); ok {
+		jm := uv.Interface().(json.Marshaler)
+		b, err := jm.MarshalJSON()
 		if err != nil {
 			return nil, err
 		}
 		s := string(b)
 		return &Value{Str: &s}, nil
 	}
-	if v, ok := implements(v, jsonMarshalerInterface); ok {
-		v := v.Interface().(json.Marshaler)
-		b, err := v.MarshalJSON()
-		if err != nil {
-			return nil, err
-		}
-		s := string(b)
-		return &Value{Str: &s}, nil
-	}
-	switch v.Kind() {
+	switch t.Kind() {
 	case reflect.String:
 		s := v.Interface().(string)
 		return &Value{Str: &s}, nil
@@ -182,13 +182,13 @@ func valueToValue(v reflect.Value) (*Value, error) {
 		return &Value{Bool: (*Bool)(&b)}, nil
 
 	default:
-		switch v.Type() {
-		case reflect.TypeOf(time.Time{}):
+		switch t {
+		case timeType:
 			s := v.Interface().(time.Time).Format(time.RFC3339)
 			return &Value{Str: &s}, nil
 
 		default:
-			panic(v.Type().String())
+			panic(t.String())
 		}
 	}
 }
@@ -263,7 +263,7 @@ func marshalMap(w io.Writer, indent string, entries []*MapEntry) error {
 		}
 		fmt.Fprintln(w, ",")
 	}
-	fmt.Fprintf(w, "%s}\n", indent[:len(indent)-2])
+	fmt.Fprintf(w, "%s}", indent[:len(indent)-2])
 	return nil
 }
 

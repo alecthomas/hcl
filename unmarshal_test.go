@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alecthomas/repr"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,10 +38,11 @@ func TestUnmarshal(t *testing.T) {
 	timestamp, err := time.Parse(time.RFC3339, "2020-01-02T15:04:05Z")
 	require.NoError(t, err)
 	tests := []struct {
-		name string
-		hcl  string
-		dest interface{}
-		fail string
+		name  string
+		hcl   string
+		dest  interface{}
+		fail  string
+		fixup func(interface{})
 	}{
 		{name: "Embed",
 			hcl: `
@@ -289,6 +291,25 @@ func TestUnmarshal(t *testing.T) {
 				Block: []*strBlock{{Str: "foo"}, {Str: "bar"}},
 			},
 		},
+		{name: "Remain",
+			hcl: `
+name = "hello"
+world = "world"
+how = 1
+are = true
+`,
+			dest: remainStruct{
+				Name: "hello",
+				Remain: []*Entry{
+					attr("world", str("world")),
+					attr("how", num(1)),
+					attr("are", hbool(true)),
+				},
+			},
+			fixup: func(i interface{}) {
+				normaliseEntries(i.(*remainStruct).Remain)
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -299,10 +320,20 @@ func TestUnmarshal(t *testing.T) {
 				require.EqualError(t, err, test.fail)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, test.dest, rv.Elem().Interface())
+				if test.fixup != nil {
+					test.fixup(actual)
+				}
+				require.Equal(t,
+					repr.String(test.dest, repr.Indent("  ")),
+					repr.String(rv.Elem().Interface(), repr.Indent("  ")))
 			}
 		})
 	}
+}
+
+type remainStruct struct {
+	Name   string   `hcl:"name"`
+	Remain []*Entry `hcl:",remain"`
 }
 
 func intlistp(i ...int) *[]int { return &i }

@@ -47,5 +47,5 @@ Tag                  | Description
 `block`              | Specifies that the value is to populated from a block.
 `label`              | Specifies that the value is to populated from a block label.
 `optional`           | As with attr, but the field is optional.
-`remain`             | Specifies that the value is to be populated from the remaining body after populating other fields. The field type must be `hcl.Node`.
+`remain`             | Specifies that the value is to be populated from the remaining body after populating other fields. The field type must be of type `[]*hcl.Entry`.
 

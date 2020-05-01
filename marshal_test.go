@@ -90,7 +90,6 @@ map = {
   "hello": "world",
   "waz": "foo",
 }
-
 list = [1, 2, 3]
 `,
 		},
