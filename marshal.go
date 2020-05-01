@@ -2,11 +2,15 @@ package hcl
 
 import (
 	"bytes"
+	"encoding"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
 	"reflect"
+	"sort"
 	"strings"
+	"time"
 )
 
 // Marshal a Go type to HCL.
@@ -104,6 +108,28 @@ func fieldToAttr(field field, tag tag) (*Attribute, error) {
 }
 
 func valueToValue(v reflect.Value) (*Value, error) {
+	if v.Type() == reflect.TypeOf(time.Duration(0)) {
+		s := v.Interface().(time.Duration).String()
+		return &Value{Str: &s}, nil
+	}
+	if v, ok := implements(v, textMarshalerInterface); ok {
+		v := v.Interface().(encoding.TextMarshaler)
+		b, err := v.MarshalText()
+		if err != nil {
+			return nil, err
+		}
+		s := string(b)
+		return &Value{Str: &s}, nil
+	}
+	if v, ok := implements(v, jsonMarshalerInterface); ok {
+		v := v.Interface().(json.Marshaler)
+		b, err := v.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		s := string(b)
+		return &Value{Str: &s}, nil
+	}
 	switch v.Kind() {
 	case reflect.String:
 		s := v.Interface().(string)
@@ -123,7 +149,14 @@ func valueToValue(v reflect.Value) (*Value, error) {
 
 	case reflect.Map:
 		entries := []*MapEntry{}
+		sorted := []reflect.Value{}
 		for _, key := range v.MapKeys() {
+			sorted = append(sorted, key)
+		}
+		sort.Slice(sorted, func(i, j int) bool {
+			return sorted[i].String() < sorted[j].String()
+		})
+		for _, key := range sorted {
 			value, err := valueToValue(v.MapIndex(key))
 			if err != nil {
 				return nil, err
@@ -144,8 +177,19 @@ func valueToValue(v reflect.Value) (*Value, error) {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return &Value{Number: big.NewFloat(0).SetUint64(v.Uint())}, nil
 
+	case reflect.Bool:
+		b := v.Bool()
+		return &Value{Bool: (*Bool)(&b)}, nil
+
 	default:
-		panic(v.Type().String())
+		switch v.Type() {
+		case reflect.TypeOf(time.Time{}):
+			s := v.Interface().(time.Time).Format(time.RFC3339)
+			return &Value{Str: &s}, nil
+
+		default:
+			panic(v.Type().String())
+		}
 	}
 }
 
@@ -213,12 +257,13 @@ func marshalMap(w io.Writer, indent string, entries []*MapEntry) error {
 	fmt.Fprintln(w, "{")
 	for _, entry := range entries {
 		marshalComments(w, indent, entry.Comments)
-		fmt.Fprintf(w, "%q: ", entry.Key)
+		fmt.Fprintf(w, "%s%q: ", indent, entry.Key)
 		if err := marshalValue(w, indent+"  ", entry.Value); err != nil {
 			return err
 		}
+		fmt.Fprintln(w, ",")
 	}
-	fmt.Fprintf(w, "%s}\n", indent)
+	fmt.Fprintf(w, "%s}\n", indent[:len(indent)-2])
 	return nil
 }
 

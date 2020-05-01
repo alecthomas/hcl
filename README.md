@@ -31,4 +31,21 @@ HCL              | AST          | Structure, values, order, comments.
 HCL              | Go           | Structure, values.
 AST              | Go           | Structure, values.
 
+## Struct field tags
+
+The tag format is as with other similar serialisation packages:
+
+```
+hcl:"[<name>][,<option>]"
+```
+
+The supported options are:
+
+Tag                  | Description
+---------------------|--------------------------------------
+`attr` (default)     | Specifies that the value is to be populated from an attribute.
+`block`              | Specifies that the value is to populated from a block.
+`label`              | Specifies that the value is to populated from a block label.
+`optional`           | As with attr, but the field is optional.
+`remain`             | Specifies that the value is to be populated from the remaining body after populating other fields. The field type must be `hcl.Node`.
 

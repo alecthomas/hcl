@@ -11,7 +11,9 @@ import (
 
 var (
 	textUnmarshalerInterface = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
+	textMarshalerInterface   = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
 	jsonUnmarshalerInterface = reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()
+	jsonMarshalerInterface   = reflect.TypeOf((*json.Marshaler)(nil)).Elem()
 )
 
 // Unmarshal HCL into a Go struct.
@@ -373,7 +375,7 @@ func parseTag(parent reflect.Type, t reflect.StructField) tag {
 func implements(v reflect.Value, iface reflect.Type) (reflect.Value, bool) {
 	if v.Type().Implements(iface) {
 		return v, true
-	} else if v.Addr().Type().Implements(iface) {
+	} else if v.CanAddr() && v.Addr().Type().Implements(iface) {
 		return v.Addr(), true
 	}
 	return reflect.Value{}, false
