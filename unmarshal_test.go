@@ -42,7 +42,7 @@ func TestUnmarshal(t *testing.T) {
 		hcl   string
 		dest  interface{}
 		fail  string
-		fixup func(interface{})
+		fixup func(interface{}) // fixup unmarshalled structs
 	}{
 		{name: "Embed",
 			hcl: `
@@ -301,9 +301,9 @@ are = true
 			dest: remainStruct{
 				Name: "hello",
 				Remain: []*Entry{
-					attr("world", str("world")),
-					attr("how", num(1)),
 					attr("are", hbool(true)),
+					attr("how", num(1)),
+					attr("world", str("world")),
 				},
 			},
 			fixup: func(i interface{}) {

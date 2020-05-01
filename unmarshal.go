@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 )
@@ -79,6 +80,9 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 			for _, entries := range mentries {
 				remaining = append(remaining, entries...)
 			}
+			sort.Slice(remaining, func(i, j int) bool {
+				return remaining[i].Key() < remaining[j].Key()
+			})
 			field.v.Set(reflect.ValueOf(remaining))
 			return nil
 		}
