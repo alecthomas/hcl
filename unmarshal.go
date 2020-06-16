@@ -315,6 +315,12 @@ func unmarshalValue(rv reflect.Value, v *Value) error {
 		}
 		return unmarshalValue(rv.Elem(), v)
 
+	case reflect.Bool:
+		if v.Bool == nil {
+			return fmt.Errorf("expected a bool but got %s", v)
+		}
+		rv.SetBool(bool(*v.Bool))
+
 	default:
 		panic(rv.Kind().String())
 	}

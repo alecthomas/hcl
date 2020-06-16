@@ -347,6 +347,7 @@ aws {
 
 server {
   acl {
+    disable = true
     get "/**" {
       users = ["*"]
       capabilities = ["users_service_owners"]
@@ -390,11 +391,12 @@ type Rule struct {
 	Capabilities []string `hcl:"capabilities,optional"`
 }
 type ACL struct {
-	GET    []Rule `hcl:"get,block"`
-	POST   []Rule `hcl:"post,block"`
-	PUT    []Rule `hcl:"put,block"`
-	DELETE []Rule `hcl:"delete,block"`
-	GRPC   []Rule `hcl:"grpc,block"`
+	Disable bool   `hcl:"disable"`
+	GET     []Rule `hcl:"get,block"`
+	POST    []Rule `hcl:"post,block"`
+	PUT     []Rule `hcl:"put,block"`
+	DELETE  []Rule `hcl:"delete,block"`
+	GRPC    []Rule `hcl:"grpc,block"`
 }
 type Server struct {
 	ACL                         ACL     `hcl:"acl,block"`
@@ -417,6 +419,7 @@ func TestUnmarshalComplex(t *testing.T) {
 		},
 		Server: Server{
 			ACL: ACL{
+				Disable: true,
 				GET: []Rule{
 					{
 						Target:       "/**",
