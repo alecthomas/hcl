@@ -80,6 +80,9 @@ func TestParse(t *testing.T) {
 			`,
 			expected: hcl(block("block", nil, block("nested", nil))),
 		},
+		{name: "EmptyList",
+			hcl:      `a = []`,
+			expected: hcl(attr("a", list()))},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -130,11 +133,11 @@ func normaliseValue(val *Value) {
 }
 
 func list(elements ...*Value) *Value {
-	return &Value{List: elements}
+	return &Value{List: elements, HaveList: true}
 }
 
 func hmap(kv ...*MapEntry) *Value {
-	return &Value{Map: kv}
+	return &Value{Map: kv, HaveMap: true}
 }
 
 func hkv(k string, v *Value) *MapEntry {

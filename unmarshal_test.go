@@ -63,7 +63,7 @@ func TestUnmarshal(t *testing.T) {
 				name {}
 			`,
 			dest: struct{}{},
-			fail: "2:5,3:5: name cannot be both block and attribute",
+			fail: "2:5: 3:5: name cannot be both block and attribute",
 		},
 		{name: "DuplicateAttribute",
 			hcl: `

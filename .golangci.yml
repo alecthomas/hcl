@@ -21,6 +21,9 @@ linters:
     - gocognit
     - gomnd
     - scopelint
+    - nestif
+    - goerr113
+    - testpackage
 
 linters-settings:
   govet:

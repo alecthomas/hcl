@@ -145,7 +145,7 @@ func valueToValue(v reflect.Value) (*Value, error) {
 			}
 			list = append(list, elv)
 		}
-		return &Value{List: list}, nil
+		return &Value{List: list, HaveList: true}, nil
 
 	case reflect.Map:
 		entries := []*MapEntry{}
@@ -166,7 +166,7 @@ func valueToValue(v reflect.Value) (*Value, error) {
 				Value: value,
 			})
 		}
-		return &Value{Map: entries}, nil
+		return &Value{Map: entries, HaveMap: true}, nil
 
 	case reflect.Float32, reflect.Float64:
 		return &Value{Number: big.NewFloat(v.Float())}, nil
@@ -246,7 +246,7 @@ func marshalAttribute(w io.Writer, indent string, attribute *Attribute) error {
 }
 
 func marshalValue(w io.Writer, indent string, value *Value) error {
-	if value.Map != nil {
+	if value.HaveMap {
 		return marshalMap(w, indent+"  ", value.Map)
 	}
 	fmt.Fprintf(w, "%s", value)

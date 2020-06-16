@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/alecthomas/participle"
 )
 
 var (
@@ -51,7 +53,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 		if ok {
 			// Mismatch in type.
 			if !((existing[0].Block == nil) == (entry.Block == nil)) {
-				return fmt.Errorf("%s,%s: %s cannot be both block and attribute", existing[0].Pos, entry.Pos, key)
+				return participle.Errorf(existing[0].Pos, "%s: %s cannot be both block and attribute", entry.Pos, key)
 			}
 		}
 		mentries[key] = append(mentries[key], entry)
@@ -106,13 +108,13 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 			if uv, ok := implements(field.v, jsonUnmarshalerInterface); ok {
 				err := uv.Interface().(json.Unmarshaler).UnmarshalJSON([]byte(val.String()))
 				if err != nil {
-					return fmt.Errorf("%s: invalid value: %s", val.Pos, err)
+					return participle.Wrapf(val.Pos, err, "invalid value")
 				}
 				continue
 			} else if uv, ok := implements(field.v, textUnmarshalerInterface); ok {
 				err := uv.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(*val.Str))
 				if err != nil {
-					return fmt.Errorf("%s: invalid value: %s", val.Pos, err)
+					return participle.Wrapf(val.Pos, err, "invalid value")
 				}
 				continue
 			} else if entry.Attribute.Value.Str != nil {
@@ -120,7 +122,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 				case time.Duration:
 					d, err := time.ParseDuration(*val.Str)
 					if err != nil {
-						return fmt.Errorf("%s: invalid duration: %s", val.Pos, err)
+						return participle.Wrapf(val.Pos, err, "invalid duration")
 					}
 					field.v.Set(reflect.ValueOf(d))
 					continue
@@ -128,7 +130,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 				case time.Time:
 					t, err := time.Parse(time.RFC3339, *val.Str)
 					if err != nil {
-						return fmt.Errorf("%s: invalid time: %s", val.Pos, err)
+						return participle.Wrapf(val.Pos, err, "invalid time")
 					}
 					field.v.Set(reflect.ValueOf(t))
 					continue
@@ -148,14 +150,14 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 		switch field.v.Kind() {
 		case reflect.Struct:
 			if len(entries) > 0 {
-				return fmt.Errorf("%s: duplicate field %q at %s", entry.Pos, entry.Key(), entry.Pos)
+				return participle.Errorf(entry.Pos, "duplicate field %q at %s", entry.Key(), entry.Pos)
 			}
 			if entry.Attribute != nil {
-				return fmt.Errorf("%s: expected a block for %q but got an attribute", entry.Pos, tag.name)
+				return participle.Errorf(entry.Pos, "expected a block for %q but got an attribute", tag.name)
 			}
 			err := unmarshalBlock(field.v, entry.Block)
 			if err != nil {
-				return fmt.Errorf("%s: %s", entry.Pos, err)
+				return participle.AnnotateError(entry.Pos, err)
 			}
 
 		case reflect.Slice:
@@ -172,12 +174,12 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 				entries = append([]*Entry{entry}, entries...)
 				for _, entry := range entries {
 					if entry.Attribute != nil {
-						return fmt.Errorf("%s: expected a block for %q but got an attribute", entry.Pos, tag.name)
+						return participle.Errorf(entry.Pos, "expected a block for %q but got an attribute", tag.name)
 					}
 					el := reflect.New(elt).Elem()
 					err := unmarshalBlock(el, entry.Block)
 					if err != nil {
-						return fmt.Errorf("%s: %s", entry.Pos, err)
+						return participle.Errorf(entry.Pos, "%s", err)
 					}
 					if ptr {
 						el = el.Addr()
@@ -191,15 +193,15 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 		default:
 			// Anything else must be a scalar value.
 			if len(entries) > 0 {
-				return fmt.Errorf("%s: duplicate field %q at %s", entry.Pos, entry.Key(), entries[0].Pos)
+				return participle.Errorf(entry.Pos, "duplicate field %q at %s", entry.Key(), entries[0].Pos)
 			}
 			if entry.Block != nil {
-				return fmt.Errorf("%s: expected an attribute for %q but got a block", entry.Pos, tag.name)
+				return participle.Errorf(entry.Pos, "expected an attribute for %q but got a block", tag.name)
 			}
 			value := entry.Attribute.Value
 			err = unmarshalValue(field.v, value)
 			if err != nil {
-				return fmt.Errorf("%s: %s", value.Pos, err)
+				return participle.AnnotateError(value.Pos, err)
 			}
 		}
 	}
@@ -226,7 +228,7 @@ func unmarshalBlock(v reflect.Value, block *Block) error {
 			continue
 		}
 		if len(labels) == 0 {
-			return fmt.Errorf("missing label %q", tag.name)
+			return participle.Errorf(block.Pos, "missing label %q", tag.name)
 		}
 		if field.v.Kind() != reflect.String {
 			panic("label field " + fieldID(v.Type(), field.t) + " must be a string")
@@ -236,7 +238,7 @@ func unmarshalBlock(v reflect.Value, block *Block) error {
 		field.v.SetString(label)
 	}
 	if len(labels) > 0 {
-		return fmt.Errorf("too many labels for block %q", block.Name)
+		return participle.Errorf(block.Pos, "too many labels for block %q", block.Name)
 	}
 	return unmarshalEntries(v, block.Body)
 }
@@ -271,7 +273,7 @@ func unmarshalValue(rv reflect.Value, v *Value) error {
 		rv.SetFloat(n)
 
 	case reflect.Map:
-		if v.Map == nil {
+		if !v.HaveMap {
 			return fmt.Errorf("expected a map but got %s", v)
 		}
 		t := rv.Type()
@@ -285,13 +287,13 @@ func unmarshalValue(rv reflect.Value, v *Value) error {
 			key.SetString(entry.Key)
 			err := unmarshalValue(value, entry.Value)
 			if err != nil {
-				return fmt.Errorf("%s: invalid map value: %s", entry.Value.Pos, err)
+				return participle.Wrapf(entry.Value.Pos, err, "invalid map value")
 			}
 			rv.SetMapIndex(key, value)
 		}
 
 	case reflect.Slice:
-		if v.List == nil {
+		if !v.HaveList {
 			return fmt.Errorf("expected a list but got %s", v)
 		}
 		t := rv.Type().Elem()
@@ -300,7 +302,7 @@ func unmarshalValue(rv reflect.Value, v *Value) error {
 			value := reflect.New(t).Elem()
 			err := unmarshalValue(value, entry)
 			if err != nil {
-				return fmt.Errorf("%s: invalid list element: %s", entry.Pos, err)
+				return participle.Wrapf(entry.Pos, err, "invalid list element")
 			}
 			lv = reflect.Append(lv, value)
 		}

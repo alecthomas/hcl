@@ -12,6 +12,7 @@ import (
 	"github.com/alecthomas/participle"
 	"github.com/alecthomas/participle/lexer"
 	"github.com/alecthomas/participle/lexer/regex"
+	"github.com/alecthomas/repr"
 )
 
 // Node is the the interface implemented by all AST nodes.
@@ -100,11 +101,13 @@ type Value struct {
 
 	Comments []string `@Comment*`
 
-	Bool   *Bool       `(  @("true" | "false")`
-	Number *big.Float  ` | @Number`
-	Str    *string     ` | @String`
-	List   []*Value    ` | "[" ( @@ ( "," @@ )* )? ","? "]"`
-	Map    []*MapEntry ` | "{" ( @@ ( "," @@ )* ","? )? "}" )`
+	Bool     *Bool       `(  @("true" | "false")`
+	Number   *big.Float  ` | @Number`
+	Str      *string     ` | @String`
+	HaveList bool        ` | ( @"["` // Need this to detect empty lists.
+	List     []*Value    `     ( @@ ( "," @@ )* )? ","? "]" )`
+	HaveMap  bool        ` | ( @"{"` // Need this to detect empty maps.
+	Map      []*MapEntry `     ( @@ ( "," @@ )* ","? )? "}" ) )`
 }
 
 func (*Value) node() {}
@@ -113,24 +116,29 @@ func (v *Value) String() string {
 	switch {
 	case v.Bool != nil:
 		return fmt.Sprintf("%v", *v.Bool)
+
 	case v.Number != nil:
 		return v.Number.String()
+
 	case v.Str != nil:
 		return fmt.Sprintf("%q", *v.Str)
-	case v.List != nil:
+
+	case v.HaveList:
 		entries := []string{}
 		for _, e := range v.List {
 			entries = append(entries, e.String())
 		}
 		return fmt.Sprintf("[%s]", strings.Join(entries, ", "))
-	case v.Map != nil:
+
+	case v.HaveMap:
 		entries := []string{}
 		for _, e := range v.Map {
 			entries = append(entries, fmt.Sprintf("%q: %s", e.Key, e.Value))
 		}
 		return fmt.Sprintf("{%s}", strings.Join(entries, ", "))
+
 	default:
-		panic("??")
+		panic(repr.String(v, repr.Hide(lexer.Position{})))
 	}
 }
 

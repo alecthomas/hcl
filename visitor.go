@@ -32,13 +32,13 @@ func Visit(node Node, visit func(node Node) error) error {
 		}
 	case *Value:
 		switch {
-		case node.List != nil:
+		case node.HaveList:
 			for _, entry := range node.List {
 				if err := Visit(entry, visit); err != nil {
 					return err
 				}
 			}
-		case node.Map != nil:
+		case node.HaveMap:
 			for _, entry := range node.Map {
 				if err := Visit(entry, visit); err != nil {
 					return err
