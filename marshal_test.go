@@ -19,6 +19,32 @@ func TestMarshalASTComplex(t *testing.T) {
 		strings.TrimSpace(string(data)))
 }
 
+func TestRoundTripEmptyList(t *testing.T) {
+	type conf struct {
+		List []string `hcl:"list"`
+	}
+	expected := hcl(attr("list", list()))
+	actual := &conf{}
+	err := UnmarshalAST(expected, actual)
+	require.NoError(t, err)
+	require.Equal(t, &conf{
+		List: []string{},
+	}, actual)
+}
+
+func TestRoundTripEmptyMap(t *testing.T) {
+	type conf struct {
+		Map map[string]string `hcl:"map"`
+	}
+	expected := hcl(attr("map", hmap()))
+	actual := &conf{}
+	err := UnmarshalAST(expected, actual)
+	require.NoError(t, err)
+	require.Equal(t, &conf{
+		Map: map[string]string{},
+	}, actual)
+}
+
 func TestMarshalComplex(t *testing.T) {
 	config := Config{}
 	err := Unmarshal([]byte(complexHCLExample), &config)

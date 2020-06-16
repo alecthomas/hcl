@@ -102,9 +102,10 @@ func hbool(b bool) *Value {
 	return &Value{Bool: (*Bool)(&b)}
 }
 
-func normaliseAST(hcl *AST) {
+func normaliseAST(hcl *AST) *AST {
 	hcl.Pos = lexer.Position{}
 	normaliseEntries(hcl.Entries)
+	return hcl
 }
 
 func normaliseEntries(entries []*Entry) {

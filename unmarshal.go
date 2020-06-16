@@ -297,7 +297,7 @@ func unmarshalValue(rv reflect.Value, v *Value) error {
 			return fmt.Errorf("expected a list but got %s", v)
 		}
 		t := rv.Type().Elem()
-		lv := rv
+		lv := reflect.MakeSlice(rv.Type(), 0, 4)
 		for _, entry := range v.List {
 			value := reflect.New(t).Elem()
 			err := unmarshalValue(value, entry)
