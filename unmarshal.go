@@ -67,14 +67,15 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 	// Apply HCL entries to our fields.
 	for _, field := range fields {
 		tag := parseTag(v.Type(), field.t) // nolint: govet
-		if tag.name == "" {
+		switch {
+		case tag.name == "":
 			continue
-		}
-		if tag.label {
+
+		case tag.label:
 			delete(seen, tag.name)
 			continue
-		}
-		if tag.remain {
+
+		case tag.remain:
 			if field.t.Type != remainType {
 				panic(fmt.Sprintf("\"remain\" field %q must be of type []*hcl.Entry but is %T", field.t.Name, field.t.Type))
 			}
@@ -88,6 +89,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 			field.v.Set(reflect.ValueOf(remaining))
 			return nil
 		}
+
 		haventSeen := !seen[tag.name]
 		entries := mentries[tag.name]
 		if len(entries) == 0 {
@@ -246,10 +248,14 @@ func unmarshalBlock(v reflect.Value, block *Block) error {
 func unmarshalValue(rv reflect.Value, v *Value) error {
 	switch rv.Kind() {
 	case reflect.String:
-		if v.Str == nil {
-			return fmt.Errorf("expected a string but got %s", v)
+		switch {
+		case v.Str != nil:
+			rv.SetString(*v.Str)
+		case v.Type != nil:
+			rv.SetString(*v.Type)
+		default:
+			return fmt.Errorf("expected a type or string but got %s", v)
 		}
-		rv.SetString(*v.Str)
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if v.Number == nil {
@@ -284,7 +290,14 @@ func unmarshalValue(rv reflect.Value, v *Value) error {
 		for _, entry := range v.Map {
 			key := reflect.New(t.Key()).Elem()
 			value := reflect.New(t.Elem()).Elem()
-			key.SetString(entry.Key)
+			switch {
+			case entry.Key.Str != nil:
+				key.SetString(*entry.Key.Str)
+			case entry.Key.Type != nil:
+				key.SetString(*entry.Key.Type)
+			default:
+				panic(fmt.Errorf("map key must be a string or type but is %s", entry.Key))
+			}
 			err := unmarshalValue(value, entry.Value)
 			if err != nil {
 				return participle.Wrapf(entry.Value.Pos, err, "invalid map value")
@@ -364,14 +377,23 @@ type tag struct {
 	label    bool
 	block    bool
 	remain   bool
+	help     string
+}
+
+func (t tag) comments() []string {
+	if t.help != "" {
+		return []string{"// " + t.help}
+	}
+	return nil
 }
 
 func parseTag(parent reflect.Type, t reflect.StructField) tag {
+	help := t.Tag.Get("help")
 	s, ok := t.Tag.Lookup("hcl")
 	if !ok {
 		s, ok = t.Tag.Lookup("json")
 		if !ok {
-			return tag{name: t.Name}
+			return tag{name: t.Name, help: help}
 		}
 	}
 	parts := strings.Split(s, ",")
@@ -384,18 +406,18 @@ func parseTag(parent reflect.Type, t reflect.StructField) tag {
 		name = t.Name
 	}
 	if len(parts) == 1 {
-		return tag{name: name}
+		return tag{name: name, help: help}
 	}
 	option := parts[1]
 	switch option {
 	case "optional", "omitempty":
-		return tag{name: name, optional: true}
+		return tag{name: name, optional: true, help: help}
 	case "label":
-		return tag{name: name, label: true}
+		return tag{name: name, label: true, help: help}
 	case "block":
-		return tag{name: name, block: true, optional: true}
+		return tag{name: name, block: true, optional: true, help: help}
 	case "remain":
-		return tag{name: name, remain: true}
+		return tag{name: name, remain: true, help: help}
 	default:
 		panic("invalid HCL tag option " + option + " on " + id)
 	}
@@ -408,4 +430,13 @@ func implements(v reflect.Value, iface reflect.Type) (reflect.Value, bool) {
 		return v.Addr(), true
 	}
 	return reflect.Value{}, false
+}
+
+func typeImplements(t reflect.Type, iface reflect.Type) bool {
+	if t.Implements(iface) {
+		return true
+	} else if reflect.PtrTo(t).Implements(iface) {
+		return true
+	}
+	return false
 }

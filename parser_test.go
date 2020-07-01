@@ -126,6 +126,7 @@ func normaliseValue(val *Value) {
 	val.Pos = lexer.Position{}
 	for _, entry := range val.Map {
 		entry.Pos = lexer.Position{}
+		normaliseValue(entry.Key)
 		normaliseValue(entry.Value)
 	}
 	for _, entry := range val.List {
@@ -142,7 +143,7 @@ func hmap(kv ...*MapEntry) *Value {
 }
 
 func hkv(k string, v *Value) *MapEntry {
-	return &MapEntry{Key: k, Value: v}
+	return &MapEntry{Key: &Value{Str: &k}, Value: v}
 }
 
 func hcl(entries ...*Entry) *AST {

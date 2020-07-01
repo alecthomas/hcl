@@ -24,27 +24,7 @@ func Marshal(v interface{}) ([]byte, error) {
 
 // MarshalToAST marshals a Go type to a hcl.AST.
 func MarshalToAST(v interface{}) (*AST, error) {
-	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Ptr {
-		return nil, fmt.Errorf("expected a pointer to a struct, not %T", v)
-	}
-	rv = rv.Elem()
-	if rv.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("expected a pointer to a struct, not %T", v)
-	}
-	var (
-		err    error
-		labels []string
-		ast    = &AST{}
-	)
-	ast.Entries, labels, err = structToEntries(rv)
-	if err != nil {
-		return nil, err
-	}
-	if len(labels) > 0 {
-		return nil, fmt.Errorf("unexpected labels %s at top level", strings.Join(labels, ", "))
-	}
-	return ast, nil
+	return marshalToAST(v, false)
 }
 
 // MarshalAST marshals an AST to HCL bytes.
@@ -59,51 +39,94 @@ func MarshalASTToWriter(ast *AST, w io.Writer) error {
 	return marshalEntries(w, "", ast.Entries)
 }
 
-func structToEntries(v reflect.Value) (entries []*Entry, labels []string, err error) {
+func marshalToAST(v interface{}, schema bool) (*AST, error) {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("expected a pointer to a struct, not %T", v)
+	}
+	rv = rv.Elem()
+	if rv.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("expected a pointer to a struct, not %T", v)
+	}
+	var (
+		err    error
+		labels []string
+		ast    = &AST{}
+	)
+	ast.Entries, labels, err = structToEntries(rv, schema)
+	if err != nil {
+		return nil, err
+	}
+	if len(labels) > 0 {
+		return nil, fmt.Errorf("unexpected labels %s at top level", strings.Join(labels, ", "))
+	}
+	return ast, nil
+}
+
+func structToEntries(v reflect.Value, schema bool) (entries []*Entry, labels []string, err error) {
 	fields, err := flattenFields(v)
 	if err != nil {
 		return nil, nil, err
 	}
 	for _, field := range fields {
 		tag := parseTag(v.Type(), field.t)
-		if tag.label { // nolint: gocritic
-			labels = append(labels, field.v.String())
-		} else if tag.block {
+		comments := tag.comments()
+		switch {
+		case tag.label:
+			if schema {
+				labels = append(labels, tag.name)
+			} else {
+				labels = append(labels, field.v.String())
+			}
+
+		case tag.block:
 			if field.v.Kind() == reflect.Slice {
-				blocks, err := sliceToBlocks(field.v, tag)
+				var blocks []*Block
+				if schema {
+					block, err := sliceToBlockSchema(field.v.Type(), tag)
+					if err == nil {
+						blocks = append(blocks, block)
+					}
+				} else {
+					blocks, err = sliceToBlocks(field.v, tag)
+				}
 				if err != nil {
 					return nil, nil, err
 				}
 				for _, block := range blocks {
-					entries = append(entries, &Entry{Block: block})
+					entries = append(entries, &Entry{Block: block, Comments: comments})
 				}
 			} else {
-				block, err := valueToBlock(field.v, tag)
+				block, err := valueToBlock(field.v, tag, schema)
 				if err != nil {
 					return nil, nil, err
 				}
-				entries = append(entries, &Entry{Block: block})
+				entries = append(entries, &Entry{Block: block, Comments: comments})
 			}
-		} else {
-			if tag.optional && field.v.IsZero() {
-				continue
-			}
-			attr, err := fieldToAttr(field, tag)
+
+		case tag.optional && field.v.IsZero() && !schema:
+
+		default:
+			attr, err := fieldToAttr(field, tag, schema)
 			if err != nil {
 				return nil, nil, err
 			}
-			entries = append(entries, &Entry{Attribute: attr})
+			entries = append(entries, &Entry{Attribute: attr, Comments: comments})
 		}
 	}
 	return entries, labels, nil
 }
 
-func fieldToAttr(field field, tag tag) (*Attribute, error) {
+func fieldToAttr(field field, tag tag, schema bool) (*Attribute, error) {
 	attr := &Attribute{
 		Key: tag.name,
 	}
 	var err error
-	attr.Value, err = valueToValue(field.v)
+	if schema {
+		attr.Value, err = attrSchema(field.v.Type())
+	} else {
+		attr.Value, err = valueToValue(field.v)
+	}
 	return attr, err
 }
 
@@ -161,8 +184,9 @@ func valueToValue(v reflect.Value) (*Value, error) {
 			if err != nil {
 				return nil, err
 			}
+			keyStr := key.String()
 			entries = append(entries, &MapEntry{
-				Key:   key.String(),
+				Key:   &Value{Str: &keyStr},
 				Value: value,
 			})
 		}
@@ -193,19 +217,19 @@ func valueToValue(v reflect.Value) (*Value, error) {
 	}
 }
 
-func valueToBlock(v reflect.Value, tag tag) (*Block, error) {
+func valueToBlock(v reflect.Value, tag tag, schema bool) (*Block, error) {
 	block := &Block{
 		Name: tag.name,
 	}
 	var err error
-	block.Body, block.Labels, err = structToEntries(v)
+	block.Body, block.Labels, err = structToEntries(v, schema)
 	return block, err
 }
 
 func sliceToBlocks(sv reflect.Value, tag tag) ([]*Block, error) {
 	blocks := []*Block{}
 	for i := 0; i != sv.Len(); i++ {
-		block, err := valueToBlock(sv.Index(i), tag)
+		block, err := valueToBlock(sv.Index(i), tag, false)
 		if err != nil {
 			return nil, err
 		}
@@ -257,7 +281,7 @@ func marshalMap(w io.Writer, indent string, entries []*MapEntry) error {
 	fmt.Fprintln(w, "{")
 	for _, entry := range entries {
 		marshalComments(w, indent, entry.Comments)
-		fmt.Fprintf(w, "%s%q: ", indent, entry.Key)
+		fmt.Fprintf(w, "%s%s: ", indent, entry.Key)
 		if err := marshalValue(w, indent+"  ", entry.Value); err != nil {
 			return err
 		}

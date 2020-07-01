@@ -84,7 +84,7 @@ type MapEntry struct {
 
 	Comments []string `@Comment*`
 
-	Key   string `@(Ident | String) ":"`
+	Key   *Value `@@ ":"`
 	Value *Value `@@`
 }
 
@@ -103,7 +103,8 @@ type Value struct {
 
 	Bool     *Bool       `(  @("true" | "false")`
 	Number   *big.Float  ` | @Number`
-	Str      *string     ` | @String`
+	Type     *string     ` | @("number":Ident | "string":Ident | "boolean":Ident)`
+	Str      *string     ` | @(String | Ident)`
 	HaveList bool        ` | ( @"["` // Need this to detect empty lists.
 	List     []*Value    `     ( @@ ( "," @@ )* )? ","? "]" )`
 	HaveMap  bool        ` | ( @"{"` // Need this to detect empty maps.
@@ -133,9 +134,12 @@ func (v *Value) String() string {
 	case v.HaveMap:
 		entries := []string{}
 		for _, e := range v.Map {
-			entries = append(entries, fmt.Sprintf("%q: %s", e.Key, e.Value))
+			entries = append(entries, fmt.Sprintf("%s: %s", e.Key, e.Value))
 		}
 		return fmt.Sprintf("{%s}", strings.Join(entries, ", "))
+
+	case v.Type != nil:
+		return fmt.Sprintf("%s", *v.Type)
 
 	default:
 		panic(repr.String(v, repr.Hide(lexer.Position{})))
