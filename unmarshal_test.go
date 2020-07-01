@@ -458,3 +458,15 @@ func TestUnmarshalComplex(t *testing.T) {
 	}
 	require.Equal(t, expected, config)
 }
+
+func TestUnmarshalPointers(t *testing.T) {
+	b := struct {
+		F *time.Time `hcl:"f"`
+	}{}
+	err := Unmarshal([]byte(`
+f = "2017-07-07T00:00:00Z"
+`), &b)
+	require.NoError(t, err)
+	require.NotNil(t, b.F)
+	require.Equal(t, time.Date(2017, 7, 7, 0, 0, 0, 0, time.UTC), *b.F)
+}

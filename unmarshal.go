@@ -102,6 +102,15 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 		entries = entries[1:]
 		mentries[tag.name] = entries
 
+		// Field is a pointer, create value if necessary, then move field down.
+		if field.v.Kind() == reflect.Ptr {
+			if field.v.IsNil() {
+				field.v.Set(reflect.New(field.v.Type().Elem()))
+			}
+			field.v = field.v.Elem()
+			field.t.Type = field.t.Type.Elem()
+		}
+
 		// Check for unmarshaler interfaces and other special cases.
 		if entry.Attribute != nil {
 			val := entry.Attribute.Value
@@ -136,15 +145,6 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 					continue
 				}
 			}
-		}
-
-		// Field is a pointer, create value if necessary, then move field down.
-		if field.v.Kind() == reflect.Ptr {
-			if field.v.IsNil() {
-				field.v.Set(reflect.New(field.v.Type().Elem()))
-			}
-			field.v = field.v.Elem()
-			field.t.Type = field.t.Type.Elem()
 		}
 
 		switch field.v.Kind() {
