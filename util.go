@@ -4,7 +4,10 @@ package hcl
 func StripComments(node Node) error {
 	return Visit(node, func(node Node, next func() error) error {
 		switch node := node.(type) {
-		case *Entry:
+		case *Attribute:
+			node.Comments = nil
+
+		case *Block:
 			node.Comments = nil
 
 		case *MapEntry:

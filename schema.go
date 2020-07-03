@@ -54,7 +54,8 @@ func attrSchema(t reflect.Type) (*Value, error) {
 
 func sliceToBlockSchema(t reflect.Type, tag tag) (*Block, error) {
 	block := &Block{
-		Name: tag.name,
+		Name:     tag.name,
+		Comments: tag.comments(),
 	}
 	var err error
 	block.Body, block.Labels, err = structToEntries(reflect.New(t.Elem()).Elem(), true)

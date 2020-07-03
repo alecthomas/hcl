@@ -70,7 +70,6 @@ func structToEntries(v reflect.Value, schema bool) (entries []*Entry, labels []s
 	}
 	for _, field := range fields {
 		tag := parseTag(v.Type(), field.t)
-		comments := tag.comments()
 		switch {
 		case tag.label:
 			if schema {
@@ -94,14 +93,14 @@ func structToEntries(v reflect.Value, schema bool) (entries []*Entry, labels []s
 					return nil, nil, err
 				}
 				for _, block := range blocks {
-					entries = append(entries, &Entry{Block: block, Comments: comments})
+					entries = append(entries, &Entry{Block: block})
 				}
 			} else {
 				block, err := valueToBlock(field.v, tag, schema)
 				if err != nil {
 					return nil, nil, err
 				}
-				entries = append(entries, &Entry{Block: block, Comments: comments})
+				entries = append(entries, &Entry{Block: block})
 			}
 
 		case tag.optional && field.v.IsZero() && !schema:
@@ -111,7 +110,7 @@ func structToEntries(v reflect.Value, schema bool) (entries []*Entry, labels []s
 			if err != nil {
 				return nil, nil, err
 			}
-			entries = append(entries, &Entry{Attribute: attr, Comments: comments})
+			entries = append(entries, &Entry{Attribute: attr})
 		}
 	}
 	return entries, labels, nil
@@ -119,7 +118,8 @@ func structToEntries(v reflect.Value, schema bool) (entries []*Entry, labels []s
 
 func fieldToAttr(field field, tag tag, schema bool) (*Attribute, error) {
 	attr := &Attribute{
-		Key: tag.name,
+		Key:      tag.name,
+		Comments: tag.comments(),
 	}
 	var err error
 	if schema {
@@ -219,7 +219,8 @@ func valueToValue(v reflect.Value) (*Value, error) {
 
 func valueToBlock(v reflect.Value, tag tag, schema bool) (*Block, error) {
 	block := &Block{
-		Name: tag.name,
+		Name:     tag.name,
+		Comments: tag.comments(),
 	}
 	var err error
 	block.Body, block.Labels, err = structToEntries(v, schema)
@@ -240,16 +241,16 @@ func sliceToBlocks(sv reflect.Value, tag tag) ([]*Block, error) {
 
 func marshalEntries(w io.Writer, indent string, entries []*Entry) error {
 	for i, entry := range entries {
-		marshalComments(w, indent, entry.Comments)
-		if entry.Block != nil { // nolint: gocritic
-			if err := marshalBlock(w, indent, entry.Block); err != nil {
+		if block := entry.Block; block != nil {
+			if err := marshalBlock(w, indent, block); err != nil {
 				return err
 			}
 			if i != len(entries)-1 {
 				fmt.Fprintln(w)
 			}
-		} else if entry.Attribute != nil {
-			if err := marshalAttribute(w, indent, entry.Attribute); err != nil {
+		} else if attr := entry.Attribute; attr != nil {
+			marshalComments(w, indent, attr.Comments)
+			if err := marshalAttribute(w, indent, attr); err != nil {
 				return err
 			}
 		} else {
@@ -292,6 +293,7 @@ func marshalMap(w io.Writer, indent string, entries []*MapEntry) error {
 }
 
 func marshalBlock(w io.Writer, indent string, block *Block) error {
+	marshalComments(w, indent, block.Comments)
 	fmt.Fprintf(w, "%s%s ", indent, block.Name)
 	for _, label := range block.Labels {
 		fmt.Fprintf(w, "%q ", label)

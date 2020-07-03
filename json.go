@@ -2,11 +2,18 @@ package hcl
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 
 	"github.com/alecthomas/participle/lexer"
 	"github.com/alecthomas/repr"
 )
+
+func (a *AST) MarshalJSON() ([]byte, error) {
+	m := &jsonVisitor{&bytes.Buffer{}}
+	err := Visit(a, m.Visit)
+	return m.Bytes(), err
+}
 
 type jsonVisitor struct {
 	*bytes.Buffer
@@ -29,6 +36,13 @@ func (w *jsonVisitor) Visit(node Node, next func() error) error {
 
 	case *Block:
 		fmt.Fprintf(w, "%q:{", node.Name)
+		if len(node.Comments) > 0 {
+			fmt.Fprint(w, `"__comments__":`)
+			if err := json.NewEncoder(w).Encode(node.Comments); err != nil {
+				return err
+			}
+			fmt.Fprint(w, `,`)
+		}
 		for _, label := range node.Labels {
 			fmt.Fprintf(w, "%q:{", label)
 		}
@@ -47,6 +61,13 @@ func (w *jsonVisitor) Visit(node Node, next func() error) error {
 		return nil
 
 	case *Attribute:
+		if len(node.Comments) > 0 {
+			fmt.Fprintf(w, `"__%s_comments__":`, node.Key)
+			if err := json.NewEncoder(w).Encode(node.Comments); err != nil {
+				return err
+			}
+			fmt.Fprint(w, `,`)
+		}
 		fmt.Fprintf(w, "%q:", node.Key)
 
 	case *Value:

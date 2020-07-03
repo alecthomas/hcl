@@ -4,7 +4,6 @@
 package hcl
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"math/big"
@@ -27,19 +26,11 @@ type AST struct {
 	Entries []*Entry `@@*`
 }
 
-func (a *AST) MarshalJSON() ([]byte, error) {
-	m := &jsonVisitor{&bytes.Buffer{}}
-	err := Visit(a, m.Visit)
-	return m.Bytes(), err
-}
-
 func (*AST) node() {}
 
 // Entry at the top-level of a HCL file or block.
 type Entry struct {
 	Pos lexer.Position
-
-	Comments []string `@Comment*`
 
 	Attribute *Attribute `(   @@`
 	Block     *Block     `  | @@ )`
@@ -65,6 +56,8 @@ func (e *Entry) Key() string {
 type Attribute struct {
 	Pos lexer.Position
 
+	Comments []string `@Comment*`
+
 	Key   string `@Ident "="`
 	Value *Value `@@`
 }
@@ -78,6 +71,8 @@ func (a *Attribute) String() string {
 // Block represents am optionally labelled HCL block.
 type Block struct {
 	Pos lexer.Position
+
+	Comments []string `@Comment*`
 
 	Name   string   `@Ident`
 	Labels []string `@( Ident | String )*`
@@ -162,7 +157,12 @@ var (
 
 		whitespace = \s+
 	`))
-	parser = participle.MustBuild(&AST{}, participle.Lexer(lex), participle.Unquote(), participle.Map(stripComment, "Comment"))
+	parser = participle.MustBuild(&AST{},
+		participle.Lexer(lex),
+		participle.Unquote(),
+		participle.Map(stripComment, "Comment"),
+		// We need lookahead to ensure prefixed comments are associated with the right nodes.
+		participle.UseLookahead(50))
 )
 
 var stripCommentRe = regexp.MustCompile(`^//\s*|^/\*|\*/$`)

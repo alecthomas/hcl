@@ -54,4 +54,5 @@ func TestSchema(t *testing.T) {
 	ast, err := ParseBytes(data)
 	require.NoError(t, err)
 	require.Equal(t, normaliseAST(schema), normaliseAST(ast))
+	// fmt.Printf("%s\n", b)
 }

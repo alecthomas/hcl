@@ -23,10 +23,10 @@ func TestParse(t *testing.T) {
 				attr = true
 			`,
 			expected: hcl(&Entry{
-				Comments: []string{"A comment"},
 				Attribute: &Attribute{
-					Key:   "attr",
-					Value: hbool(true),
+					Key:      "attr",
+					Value:    hbool(true),
+					Comments: []string{"A comment"},
 				},
 			}),
 		},
