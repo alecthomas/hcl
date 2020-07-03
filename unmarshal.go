@@ -382,7 +382,7 @@ type tag struct {
 
 func (t tag) comments() []string {
 	if t.help != "" {
-		return []string{"// " + t.help}
+		return []string{t.help}
 	}
 	return nil
 }

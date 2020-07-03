@@ -4,9 +4,11 @@
 package hcl
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"math/big"
+	"regexp"
 	"strings"
 
 	"github.com/alecthomas/participle"
@@ -23,6 +25,12 @@ type AST struct {
 	Pos lexer.Position
 
 	Entries []*Entry `@@*`
+}
+
+func (a *AST) MarshalJSON() ([]byte, error) {
+	m := &jsonVisitor{&bytes.Buffer{}}
+	err := Visit(a, m.Visit)
+	return m.Bytes(), err
 }
 
 func (*AST) node() {}
@@ -99,8 +107,6 @@ func (b *Bool) Capture(values []string) error { *b = values[0] == "true"; return
 type Value struct {
 	Pos lexer.Position
 
-	Comments []string `@Comment*`
-
 	Bool     *Bool       `(  @("true" | "false")`
 	Number   *big.Float  ` | @Number`
 	Type     *string     ` | @("number":Ident | "string":Ident | "boolean":Ident)`
@@ -156,8 +162,15 @@ var (
 
 		whitespace = \s+
 	`))
-	parser = participle.MustBuild(&AST{}, participle.Lexer(lex), participle.Unquote())
+	parser = participle.MustBuild(&AST{}, participle.Lexer(lex), participle.Unquote(), participle.Map(stripComment, "Comment"))
 )
+
+var stripCommentRe = regexp.MustCompile(`^//\s*|^/\*|\*/$`)
+
+func stripComment(token lexer.Token) (lexer.Token, error) {
+	token.Value = stripCommentRe.ReplaceAllString(token.Value, "")
+	return token, nil
+}
 
 // Parse HCL from an io.Reader.
 func Parse(r io.Reader) (*AST, error) {

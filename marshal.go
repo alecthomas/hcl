@@ -307,6 +307,8 @@ func marshalBlock(w io.Writer, indent string, block *Block) error {
 
 func marshalComments(w io.Writer, indent string, comments []string) {
 	for _, comment := range comments {
-		fmt.Fprintf(w, "%s%s\n", indent, comment)
+		for _, line := range strings.Split(comment, "\n") {
+			fmt.Fprintf(w, "%s// %s\n", indent, line)
+		}
 	}
 }
