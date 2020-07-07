@@ -6,9 +6,14 @@ import (
 
 // Schema reflects a schema from a Go value.
 //
-// A schema is a itself HCL.
+// A schema is  itself HCL.
 func Schema(v interface{}) (*AST, error) {
-	return marshalToAST(v, true)
+	ast, err := marshalToAST(v, true)
+	if err != nil {
+		return nil, err
+	}
+	ast.Schema = true
+	return ast, nil
 }
 
 var (

@@ -21,19 +21,21 @@ type Node interface{ node() }
 
 // AST for HCL.
 type AST struct {
-	Pos lexer.Position
+	Pos lexer.Position `parser:"" json:"-"`
 
-	Entries []*Entry `@@*`
+	Entries []*Entry `parser:"@@*" json:"entries"`
+
+	Schema bool `parser:"" json:"schema,omitempty"`
 }
 
 func (*AST) node() {}
 
 // Entry at the top-level of a HCL file or block.
 type Entry struct {
-	Pos lexer.Position
+	Pos lexer.Position `parser:"" json:"-"`
 
-	Attribute *Attribute `(   @@`
-	Block     *Block     `  | @@ )`
+	Attribute *Attribute `parser:"(   @@" json:"attribute,omitempty"`
+	Block     *Block     `parser:"  | @@ )" json:"block,omitempty"`
 }
 
 func (*Entry) node() {}
@@ -54,15 +56,15 @@ func (e *Entry) Key() string {
 
 // Attribute is a key+value attribute.
 type Attribute struct {
-	Pos lexer.Position
+	Pos lexer.Position `parser:"" json:"-"`
 
-	Comments []string `@Comment*`
+	Comments []string `parser:"@Comment*" json:"comments,omitempty"`
 
-	Key   string `@Ident "="`
-	Value *Value `@@`
+	Key   string `parser:"@Ident '='" json:"key"`
+	Value *Value `parser:"@@" json:"value"`
 
 	// Set for schemas when the attribute is optional.
-	Optional bool
+	Optional bool `parser:"" json:"optional,omitempty"`
 }
 
 func (*Attribute) node() {}
@@ -73,25 +75,25 @@ func (a *Attribute) String() string {
 
 // Block represents am optionally labelled HCL block.
 type Block struct {
-	Pos lexer.Position
+	Pos lexer.Position `parser:"" json:"-"`
 
-	Comments []string `@Comment*`
+	Comments []string `parser:"@Comment*" json:"comments,omitempty"`
 
-	Name   string   `@Ident`
-	Labels []string `@( Ident | String )*`
-	Body   []*Entry `"{" @@* "}"`
+	Name   string   `parser:"@Ident" json:"name"`
+	Labels []string `parser:"@( Ident | String )*" json:"labels,omitempty"`
+	Body   []*Entry `parser:"'{' @@* '}'" json:"body"`
 }
 
 func (*Block) node() {}
 
 // MapEntry represents a key+value in a map.
 type MapEntry struct {
-	Pos lexer.Position
+	Pos lexer.Position `parser:"" json:"-"`
 
-	Comments []string `@Comment*`
+	Comments []string `parser:"@Comment*" json:"comments,omitempty"`
 
-	Key   *Value `@@ ":"`
-	Value *Value `@@`
+	Key   *Value `parser:"@@ ':'" json:"key"`
+	Value *Value `parser:"@@" json:"value"`
 }
 
 func (*MapEntry) node() {}
@@ -103,16 +105,16 @@ func (b *Bool) Capture(values []string) error { *b = values[0] == "true"; return
 
 // Value is a scalar, list or map.
 type Value struct {
-	Pos lexer.Position
+	Pos lexer.Position `parser:"" json:"-"`
 
-	Bool     *Bool       `(  @("true" | "false")`
-	Number   *big.Float  ` | @Number`
-	Type     *string     ` | @("number":Ident | "string":Ident | "boolean":Ident)`
-	Str      *string     ` | @(String | Ident)`
-	HaveList bool        ` | ( @"["` // Need this to detect empty lists.
-	List     []*Value    `     ( @@ ( "," @@ )* )? ","? "]" )`
-	HaveMap  bool        ` | ( @"{"` // Need this to detect empty maps.
-	Map      []*MapEntry `     ( @@ ( "," @@ )* ","? )? "}" ) )`
+	Bool     *Bool       `parser:"(  @('true' | 'false')" json:"bool,omitempty"`
+	Number   *big.Float  `parser:" | @Number" json:"number,omitempty"`
+	Type     *string     `parser:" | @('number':Ident | 'string':Ident | 'boolean':Ident)" json:"type,omitempty"`
+	Str      *string     `parser:" | @(String | Ident)" json:"str,omitempty"`
+	HaveList bool        `parser:" | ( @'['" json:"have_list,omitempty"` // Need this to detect empty lists.
+	List     []*Value    `parser:"     ( @@ ( ',' @@ )* )? ','? ']' )" json:"list,omitempty"`
+	HaveMap  bool        `parser:" | ( @'{'" json:"have_map,omitempty"` // Need this to detect empty maps.
+	Map      []*MapEntry `parser:"     ( @@ ( ',' @@ )* ','? )? '}' ) )" json:"map,omitempty"`
 }
 
 func (*Value) node() {}

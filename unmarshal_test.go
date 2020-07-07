@@ -471,3 +471,21 @@ f = "2017-07-07T00:00:00Z"
 	require.NotNil(t, b.F)
 	require.Equal(t, time.Date(2017, 7, 7, 0, 0, 0, 0, time.UTC), *b.F)
 }
+
+func TestUnmarshalPointers2(t *testing.T) {
+	b := struct {
+		F *struct {
+			G string `hcl:"g"`
+		} `hcl:"f,block"`
+	}{}
+	err := Unmarshal([]byte(`
+f {
+	g = "str"
+}
+`), &b)
+	require.NoError(t, err)
+	require.Equal(t, "str", b.F.G)
+	data, err := Marshal(&b)
+	require.NoError(t, err)
+	require.Equal(t, "f {\n  g = \"str\"\n}\n", string(data))
+}

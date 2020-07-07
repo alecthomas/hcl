@@ -9,14 +9,35 @@ import (
 	"github.com/alecthomas/repr"
 )
 
-func (a *AST) MarshalJSON() ([]byte, error) {
-	m := &jsonVisitor{&bytes.Buffer{}}
-	err := Visit(a, m.Visit)
+// MarshalJSONOptions controls how custom JSON marshaling is applied.
+type MarshalJSONOptions struct {
+	Comments bool
+}
+
+// MarshalJSON gives fine-grained control over JSON marshaling of an AST.
+//
+// Currently this just means that emission of comments can be controlled.
+func MarshalJSON(ast *AST, options MarshalJSONOptions) ([]byte, error) {
+	m := &jsonVisitor{
+		Buffer:             &bytes.Buffer{},
+		MarshalJSONOptions: options,
+	}
+	err := Visit(ast, m.Visit)
 	return m.Bytes(), err
 }
 
+func (a *AST) MarshalJSON() ([]byte, error) {
+	if a.Schema {
+		return json.Marshal((*rawAST)(a))
+	}
+	return MarshalJSON(a, MarshalJSONOptions{})
+}
+
+type rawAST AST
+
 type jsonVisitor struct {
 	*bytes.Buffer
+	MarshalJSONOptions
 }
 
 func (w *jsonVisitor) Visit(node Node, next func() error) error {
@@ -36,7 +57,7 @@ func (w *jsonVisitor) Visit(node Node, next func() error) error {
 
 	case *Block:
 		fmt.Fprintf(w, "%q:{", node.Name)
-		if len(node.Comments) > 0 {
+		if w.Comments && len(node.Comments) > 0 {
 			fmt.Fprint(w, `"__comments__":`)
 			if err := json.NewEncoder(w).Encode(node.Comments); err != nil {
 				return err
@@ -61,7 +82,7 @@ func (w *jsonVisitor) Visit(node Node, next func() error) error {
 		return nil
 
 	case *Attribute:
-		if len(node.Comments) > 0 {
+		if w.Comments && len(node.Comments) > 0 {
 			fmt.Fprintf(w, `"__%s_comments__":`, node.Key)
 			if err := json.NewEncoder(w).Encode(node.Comments); err != nil {
 				return err

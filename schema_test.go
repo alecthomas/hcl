@@ -1,6 +1,7 @@
 package hcl
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -45,6 +46,118 @@ block_slice "label0" "label1" {
   attr = string
 }
 `
+const expectedJSONSchema = `
+{
+  "entries": [
+    {
+      "attribute": {
+        "comments": [
+          "A string field."
+        ],
+        "key": "str",
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "attribute": {
+        "key": "num",
+        "value": {
+          "type": "number"
+        },
+        "optional": true
+      }
+    },
+    {
+      "attribute": {
+        "key": "bool",
+        "value": {
+          "type": "boolean"
+        }
+      }
+    },
+    {
+      "attribute": {
+        "key": "list",
+        "value": {
+          "have_list": true,
+          "list": [
+            {
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "attribute": {
+        "comments": [
+          "A map."
+        ],
+        "key": "map",
+        "value": {
+          "have_map": true,
+          "map": [
+            {
+              "key": {
+                "type": "string"
+              },
+              "value": {
+                "type": "number"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "block": {
+        "comments": [
+          "A block."
+        ],
+        "name": "block",
+        "labels": [
+          "name"
+        ],
+        "body": [
+          {
+            "attribute": {
+              "key": "attr",
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "block": {
+        "comments": [
+          "Repeated blocks."
+        ],
+        "name": "block_slice",
+        "labels": [
+          "label0",
+          "label1"
+        ],
+        "body": [
+          {
+            "attribute": {
+              "key": "attr",
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "schema": true
+}
+`
 
 func TestSchema(t *testing.T) {
 	schema, err := Schema(&testSchema{})
@@ -52,4 +165,7 @@ func TestSchema(t *testing.T) {
 	data, err := MarshalAST(schema)
 	require.NoError(t, err)
 	require.Equal(t, strings.TrimSpace(expectedSchema), strings.TrimSpace(string(data)))
+	data, err = json.MarshalIndent(schema, "", "  ")
+	require.NoError(t, err)
+	require.Equal(t, strings.TrimSpace(expectedJSONSchema), strings.TrimSpace(string(data)))
 }

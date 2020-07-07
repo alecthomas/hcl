@@ -350,12 +350,6 @@ func flattenFields(v reflect.Value) ([]field, error) {
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
 		f := v.Field(i)
-		if f.Kind() == reflect.Ptr {
-			if f.IsNil() {
-				f.Set(reflect.New(f.Type().Elem()))
-			}
-			f = f.Elem()
-		}
 		ft := t.Field(i)
 		if ft.Anonymous {
 			if f.Kind() != reflect.Struct {

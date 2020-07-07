@@ -64,6 +64,15 @@ func marshalToAST(v interface{}, schema bool) (*AST, error) {
 }
 
 func structToEntries(v reflect.Value, schema bool) (entries []*Entry, labels []string, err error) {
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			if !schema {
+				return nil, nil, nil
+			}
+			v = reflect.New(v.Type().Elem())
+		}
+		v = v.Elem()
+	}
 	fields, err := flattenFields(v)
 	if err != nil {
 		return nil, nil, err
