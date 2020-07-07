@@ -16,6 +16,15 @@ func Schema(v interface{}) (*AST, error) {
 	return ast, nil
 }
 
+// MustSchema constructs a schema from a Go type, or panics.
+func MustSchema(v interface{}) *AST {
+	ast, err := Schema(v)
+	if err != nil {
+		panic(err)
+	}
+	return ast
+}
+
 var (
 	strType  = "string"
 	numType  = "number"
