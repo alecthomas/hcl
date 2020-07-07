@@ -9,7 +9,7 @@ import (
 
 type testSchema struct {
 	Str   string         `hcl:"str" help:"A string field."`
-	Num   int            `hcl:"num"`
+	Num   int            `hcl:"num,optional"`
 	Bool  bool           `hcl:"bool"`
 	List  []string       `hcl:"list"`
 	Map   map[string]int `hcl:"map" help:"A map."`
@@ -27,7 +27,7 @@ type testSchema struct {
 const expectedSchema = `
 // A string field.
 str = string
-num = number
+num = number // (optional)
 bool = boolean
 list = [string]
 // A map.
@@ -52,8 +52,4 @@ func TestSchema(t *testing.T) {
 	data, err := MarshalAST(schema)
 	require.NoError(t, err)
 	require.Equal(t, strings.TrimSpace(expectedSchema), strings.TrimSpace(string(data)))
-	ast, err := ParseBytes(data)
-	require.NoError(t, err)
-	require.Equal(t, normaliseAST(schema), normaliseAST(ast))
-	// fmt.Printf("%s\n", b)
 }

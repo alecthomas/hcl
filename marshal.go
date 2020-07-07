@@ -127,6 +127,7 @@ func fieldToAttr(field field, tag tag, schema bool) (*Attribute, error) {
 	} else {
 		attr.Value, err = valueToValue(field.v)
 	}
+	attr.Optional = tag.optional && schema
 	return attr, err
 }
 
@@ -271,6 +272,9 @@ func marshalAttribute(w io.Writer, indent string, attribute *Attribute) error {
 	err := marshalValue(w, indent, attribute.Value)
 	if err != nil {
 		return err
+	}
+	if attribute.Optional {
+		fmt.Fprint(w, " // (optional)")
 	}
 	fmt.Fprintln(w)
 	return nil

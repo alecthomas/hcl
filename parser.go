@@ -60,6 +60,9 @@ type Attribute struct {
 
 	Key   string `@Ident "="`
 	Value *Value `@@`
+
+	// Set for schemas when the attribute is optional.
+	Optional bool
 }
 
 func (*Attribute) node() {}
