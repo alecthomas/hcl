@@ -348,6 +348,7 @@ aws {
 server {
   acl {
     disable = true
+
     get "/**" {
       users = ["*"]
       capabilities = ["users_service_owners"]

@@ -350,9 +350,15 @@ func flattenFields(v reflect.Value) ([]field, error) {
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
 		f := v.Field(i)
+		if f.Kind() == reflect.Ptr {
+			if f.IsNil() {
+				f.Set(reflect.New(f.Type().Elem()))
+			}
+			f = f.Elem()
+		}
 		ft := t.Field(i)
 		if ft.Anonymous {
-			if ft.Type.Kind() != reflect.Struct {
+			if f.Kind() != reflect.Struct {
 				return nil, fmt.Errorf("%s: anonymous field must be a struct", ft.Name)
 			}
 			sub, err := flattenFields(f)
@@ -382,7 +388,7 @@ type tag struct {
 
 func (t tag) comments() []string {
 	if t.help != "" {
-		return []string{t.help}
+		return strings.Split(t.help, "\n")
 	}
 	return nil
 }

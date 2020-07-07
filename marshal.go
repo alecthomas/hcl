@@ -240,19 +240,24 @@ func sliceToBlocks(sv reflect.Value, tag tag) ([]*Block, error) {
 }
 
 func marshalEntries(w io.Writer, indent string, entries []*Entry) error {
+	prevAttr := true
 	for i, entry := range entries {
 		if block := entry.Block; block != nil {
+			if i > 0 {
+				fmt.Fprintln(w)
+			}
 			if err := marshalBlock(w, indent, block); err != nil {
 				return err
 			}
-			if i != len(entries)-1 {
+			prevAttr = false
+		} else if attr := entry.Attribute; attr != nil {
+			if !prevAttr {
 				fmt.Fprintln(w)
 			}
-		} else if attr := entry.Attribute; attr != nil {
-			marshalComments(w, indent, attr.Comments)
 			if err := marshalAttribute(w, indent, attr); err != nil {
 				return err
 			}
+			prevAttr = true
 		} else {
 			panic("??")
 		}
@@ -261,6 +266,7 @@ func marshalEntries(w io.Writer, indent string, entries []*Entry) error {
 }
 
 func marshalAttribute(w io.Writer, indent string, attribute *Attribute) error {
+	marshalComments(w, indent, attribute.Comments)
 	fmt.Fprintf(w, "%s%s = ", indent, attribute.Key)
 	err := marshalValue(w, indent, attribute.Value)
 	if err != nil {

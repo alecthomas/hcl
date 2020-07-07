@@ -34,6 +34,7 @@ list = [string]
 map = {
   string: number,
 }
+
 // A block.
 block "name" {
   attr = string
