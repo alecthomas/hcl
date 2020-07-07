@@ -61,6 +61,8 @@ func attrSchema(t reflect.Type) (*Value, error) {
 	case reflect.Bool:
 		return &Value{Type: &boolType}, nil
 
+	case reflect.Struct:
+		panic("struct " + t.String() + " used as attribute, is it missing a \"block\" tag?")
 	default:
 		panic(t.String())
 	}
