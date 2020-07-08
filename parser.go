@@ -82,6 +82,9 @@ type Block struct {
 	Name   string   `parser:"@Ident" json:"name"`
 	Labels []string `parser:"@( Ident | String )*" json:"labels,omitempty"`
 	Body   []*Entry `parser:"'{' @@* '}'" json:"body"`
+
+	// The block can be repeated. This is surfaced in schemas.
+	Repeated bool `parser:"" json:"repeated,omitempty"`
 }
 
 func (*Block) node() {}

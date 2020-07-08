@@ -63,6 +63,7 @@ func attrSchema(t reflect.Type) (*Value, error) {
 
 	case reflect.Struct:
 		panic("struct " + t.String() + " used as attribute, is it missing a \"block\" tag?")
+
 	default:
 		panic(t.String())
 	}
@@ -72,6 +73,7 @@ func sliceToBlockSchema(t reflect.Type, tag tag) (*Block, error) {
 	block := &Block{
 		Name:     tag.name,
 		Comments: tag.comments(),
+		Repeated: true,
 	}
 	var err error
 	block.Body, block.Labels, err = structToEntries(reflect.New(t.Elem()).Elem(), true)

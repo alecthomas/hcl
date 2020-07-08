@@ -42,7 +42,7 @@ block "name" {
 }
 
 // Repeated blocks.
-block_slice "label0" "label1" {
+block_slice "label0" "label1" { // (repeated)
   attr = string
 }
 `
@@ -151,7 +151,8 @@ const expectedJSONSchema = `
               }
             }
           }
-        ]
+        ],
+        "repeated": true
       }
     }
   ],

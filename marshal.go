@@ -93,6 +93,7 @@ func structToEntries(v reflect.Value, schema bool) (entries []*Entry, labels []s
 				if schema {
 					block, err := sliceToBlockSchema(field.v.Type(), tag)
 					if err == nil {
+						block.Repeated = true
 						blocks = append(blocks, block)
 					}
 				} else {
@@ -317,7 +318,11 @@ func marshalBlock(w io.Writer, indent string, block *Block) error {
 	for _, label := range block.Labels {
 		fmt.Fprintf(w, "%q ", label)
 	}
-	fmt.Fprintln(w, "{")
+	if block.Repeated {
+		fmt.Fprintln(w, "{ // (repeated)")
+	} else {
+		fmt.Fprintln(w, "{")
+	}
 	err := marshalEntries(w, indent+"  ", block.Body)
 	if err != nil {
 		return err
