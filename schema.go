@@ -12,7 +12,6 @@ func Schema(v interface{}) (*AST, error) {
 	if err != nil {
 		return nil, err
 	}
-	ast.Schema = true
 	return ast, nil
 }
 

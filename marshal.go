@@ -51,7 +51,9 @@ func marshalToAST(v interface{}, schema bool) (*AST, error) {
 	var (
 		err    error
 		labels []string
-		ast    = &AST{}
+		ast    = &AST{
+			Schema: schema,
+		}
 	)
 	ast.Entries, labels, err = structToEntries(rv, schema)
 	if err != nil {

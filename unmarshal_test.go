@@ -460,6 +460,23 @@ func TestUnmarshalComplex(t *testing.T) {
 	require.Equal(t, expected, config)
 }
 
+func TestUnmarshalBlock(t *testing.T) {
+	config := `
+	get "/**" {
+		users = ["alec"]
+	}
+	`
+	hcl, err := ParseString(config)
+	require.NoError(t, err)
+	rule := &Rule{}
+	err = UnmarshalBlock(hcl.Entries[0].Block, rule)
+	require.NoError(t, err)
+	require.Equal(t, &Rule{
+		Target: "/**",
+		Users:  []string{"alec"},
+	}, rule)
+}
+
 func TestUnmarshalPointers(t *testing.T) {
 	b := struct {
 		F *time.Time `hcl:"f"`

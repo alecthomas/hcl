@@ -40,6 +40,16 @@ func UnmarshalAST(ast *AST, v interface{}) error {
 	return unmarshalEntries(rv.Elem(), ast.Entries)
 }
 
+// UnmarshalBlock into a struct.
+func UnmarshalBlock(block *Block, v interface{}) error {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Struct {
+		return fmt.Errorf("%T must be a pointer to a struct", v)
+	}
+	rv = rv.Elem()
+	return unmarshalBlock(rv, block)
+}
+
 func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 	if v.Kind() != reflect.Struct {
 		return fmt.Errorf("%T must be a struct", v.Interface())
