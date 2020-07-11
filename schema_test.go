@@ -170,3 +170,21 @@ func TestSchema(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, strings.TrimSpace(expectedJSONSchema), strings.TrimSpace(string(data)))
 }
+
+func TestBlockSchema(t *testing.T) {
+	type Block struct {
+		Label string `hcl:"label,label"`
+		Attr  string `hcl:"attr"`
+	}
+	schema, err := BlockSchema("block", &Block{})
+	require.NoError(t, err)
+	data, err := MarshalAST(schema)
+	require.NoError(t, err)
+	require.Equal(t,
+		strings.TrimSpace(`
+block "label" {
+  attr = string
+}
+`),
+		strings.TrimSpace(string(data)))
+}

@@ -1,12 +1,13 @@
 package hcl
 
 import (
+	"fmt"
 	"reflect"
 )
 
 // Schema reflects a schema from a Go value.
 //
-// A schema is  itself HCL.
+// A schema is itself HCL.
 func Schema(v interface{}) (*AST, error) {
 	ast, err := marshalToAST(v, true)
 	if err != nil {
@@ -18,6 +19,31 @@ func Schema(v interface{}) (*AST, error) {
 // MustSchema constructs a schema from a Go type, or panics.
 func MustSchema(v interface{}) *AST {
 	ast, err := Schema(v)
+	if err != nil {
+		panic(err)
+	}
+	return ast
+}
+
+// BlockSchema reflects a block schema for a Go struct.
+func BlockSchema(name string, v interface{}) (*AST, error) {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Struct {
+		return nil, fmt.Errorf("expected a pointer to a struct not %T", v)
+	}
+	block, err := valueToBlock(rv.Elem(), tag{name: name, block: true}, true)
+	if err != nil {
+		return nil, err
+	}
+	return &AST{
+		Entries: []*Entry{{Block: block}},
+		Schema:  true,
+	}, nil
+}
+
+// MustBlockSchema reflects a block schema from a Go struct, panicking if an error occurs.
+func MustBlockSchema(name string, v interface{}) *AST {
+	ast, err := BlockSchema(name, v)
 	if err != nil {
 		panic(err)
 	}
