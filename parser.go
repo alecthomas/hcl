@@ -25,6 +25,8 @@ type AST struct {
 
 	Entries []*Entry `parser:"@@*" json:"entries"`
 
+	TrailingComments []string `parser:"@Comment*" json:"trailing_comments,omitempty"`
+
 	Schema bool `parser:"" json:"schema,omitempty"`
 }
 
@@ -81,7 +83,9 @@ type Block struct {
 
 	Name   string   `parser:"@Ident" json:"name"`
 	Labels []string `parser:"@( Ident | String )*" json:"labels,omitempty"`
-	Body   []*Entry `parser:"'{' @@* '}'" json:"body"`
+	Body   []*Entry `parser:"'{' @@*" json:"body"`
+
+	TrailingComments []string `parser:"@Comment* '}'" json:"trailing_comments,omitempty"`
 
 	// The block can be repeated. This is surfaced in schemas.
 	Repeated bool `parser:"" json:"repeated,omitempty"`

@@ -83,6 +83,12 @@ func TestParse(t *testing.T) {
 		{name: "EmptyList",
 			hcl:      `a = []`,
 			expected: hcl(attr("a", list()))},
+		{name: "TrailingComments",
+			hcl: `
+					a = true
+					// trailing comment
+				`,
+			expected: trailingComments(hcl(attr("a", hbool(true))), "trailing comment")},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -148,6 +154,11 @@ func hkv(k string, v *Value) *MapEntry {
 
 func hcl(entries ...*Entry) *AST {
 	return &AST{Entries: entries}
+}
+
+func trailingComments(ast *AST, comments ...string) *AST {
+	ast.TrailingComments = comments
+	return ast
 }
 
 func block(name string, labels []string, entries ...*Entry) *Entry {
