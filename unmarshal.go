@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -221,7 +222,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 	if len(seen) > 0 {
 		need := []string{}
 		for key := range seen {
-			need = append(need, key)
+			need = append(need, strconv.Quote(key))
 		}
 		return fmt.Errorf("found extra fields %s", strings.Join(need, ", "))
 	}
