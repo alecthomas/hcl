@@ -42,10 +42,16 @@ func Unmarshal(data []byte, v interface{}, vars map[string]interface{}) error {
 				Type:  hilast.TypeMap,
 			}
 
-		case int:
+		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
 			hilVars[key] = hilast.Variable{
 				Value: value,
 				Type:  hilast.TypeInt,
+			}
+
+		case float32, float64:
+			hilVars[key] = hilast.Variable{
+				Value: value,
+				Type:  hilast.TypeFloat,
 			}
 
 		default:
