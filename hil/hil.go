@@ -1,24 +1,15 @@
-// Package main shows how to use hashicorp/hil to interpolate variables
-// into an alecthomas/hcl.AST and subsequently into a Go structure.
-package main
+// Package hil supports interpolation variables into an
+// alecthomas/hcl.AST and subsequently into a Go structure.
+package hil
 
 import (
 	"fmt"
 
 	"github.com/alecthomas/hcl"
 	"github.com/alecthomas/participle"
-	"github.com/alecthomas/repr"
 	"github.com/hashicorp/hil"
 	hilast "github.com/hashicorp/hil/ast"
 )
-
-type Config struct {
-	Version string `hcl:"version"`
-}
-
-const configSource = `
-version = "version-${commit}"
-`
 
 func Unmarshal(data []byte, v interface{}, vars map[string]interface{}) error {
 	hclAST, err := hcl.ParseBytes(data)
@@ -75,15 +66,4 @@ func Unmarshal(data []byte, v interface{}, vars map[string]interface{}) error {
 		return err
 	}
 	return hcl.UnmarshalAST(hclAST, v)
-}
-
-func main() {
-	config := &Config{}
-	err := Unmarshal([]byte(configSource), config, map[string]interface{}{
-		"commit": "43237b5e44e12c78bf478cba06dac1b88aec988c",
-	})
-	if err != nil {
-		panic(err)
-	}
-	repr.Println(config)
 }
