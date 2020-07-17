@@ -58,7 +58,7 @@ func Unmarshal(data []byte, v interface{}, vars map[string]interface{}) error {
 			return fmt.Errorf("unsupported variable type %T for %q", value, key)
 		}
 	}
-	err = InterpolateHIL(hclAST, &hil.EvalConfig{
+	err = Interpolate(hclAST, &hil.EvalConfig{
 		GlobalScope: &hilast.BasicScope{VarMap: hilVars},
 	})
 	if err != nil {
@@ -67,8 +67,8 @@ func Unmarshal(data []byte, v interface{}, vars map[string]interface{}) error {
 	return hcl.UnmarshalAST(hclAST, v)
 }
 
-// InterpolateHIL interpolates all string values in "node" using the given hil.EvalConfig.
-func InterpolateHIL(node hcl.Node, config *hil.EvalConfig) error {
+// Interpolate all string values in "node" using the given hil.EvalConfig.
+func Interpolate(node hcl.Node, config *hil.EvalConfig) error {
 	// Interpolate into AST.
 	return hcl.Visit(node, func(node hcl.Node, next func() error) error {
 		value, ok := node.(*hcl.Value)
