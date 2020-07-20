@@ -71,21 +71,38 @@ func Unmarshal(data []byte, v interface{}, vars map[string]interface{}) error {
 func Interpolate(node hcl.Node, config *hil.EvalConfig) error {
 	// Interpolate into AST.
 	return hcl.Visit(node, func(node hcl.Node, next func() error) error {
-		value, ok := node.(*hcl.Value)
-		if !ok || value.Str == nil {
-			return next()
-		}
+		switch node := node.(type) {
+		case *hcl.Value:
+			if node.Str == nil {
+				return next()
+			}
+			str, err := evalStr(config, *node.Str)
+			if err != nil {
+				return participle.Errorf(node.Pos, "%s", err)
+			}
+			node.Str = &str
 
-		hilNode, err := hil.Parse(*value.Str)
-		if err != nil {
-			return participle.Errorf(value.Pos, "%s", err.Error())
+		case *hcl.Block:
+			for i, label := range node.Labels {
+				str, err := evalStr(config, label)
+				if err != nil {
+					return participle.Errorf(node.Pos, "%s", err)
+				}
+				node.Labels[i] = str
+			}
 		}
-		out, err := hil.Eval(hilNode, config)
-		if err != nil {
-			return participle.Errorf(value.Pos, "%s", err.Error())
-		}
-		str := fmt.Sprintf("%v", out.Value)
-		value.Str = &str
 		return next()
 	})
+}
+
+func evalStr(config *hil.EvalConfig, str string) (string, error) {
+	hilNode, err := hil.Parse(str)
+	if err != nil {
+		return "", err
+	}
+	out, err := hil.Eval(hilNode, config)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%v", out.Value), nil
 }
