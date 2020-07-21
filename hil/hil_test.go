@@ -14,6 +14,7 @@ type Config struct {
 	Version string            `hcl:"version"`
 	Block   Block             `hcl:"block,block"`
 	Map     map[string]string `hcl:"map"`
+	List    []string          `hcl:"list"`
 }
 
 const configSource = `
@@ -23,6 +24,8 @@ map = {
 	commit: "${commit}",
 	"${commit}": "commit",
 }
+
+list = ["${commit}", "commit"]
 
 block "label-${commit}" {
 }
@@ -39,6 +42,11 @@ func TestHILUnmarshal(t *testing.T) {
 	expected := &Config{
 		Version: "version-43237b5e44e12c78bf478cba06dac1b88aec988c",
 		Block:   Block{Label: "label-43237b5e44e12c78bf478cba06dac1b88aec988c"},
+		Map: map[string]string{
+			"commit": "43237b5e44e12c78bf478cba06dac1b88aec988c",
+			"43237b5e44e12c78bf478cba06dac1b88aec988c": "commit",
+		},
+		List: []string{"43237b5e44e12c78bf478cba06dac1b88aec988c", "commit"},
 	}
 	require.Equal(t, expected, actual)
 }
