@@ -18,6 +18,9 @@ func Visit(node Node, visit func(node Node, next func() error) error) error {
 			}
 
 		case *MapEntry:
+			if err := Visit(node.Key, visit); err != nil {
+				return err
+			}
 			if err := Visit(node.Value, visit); err != nil {
 				return err
 			}

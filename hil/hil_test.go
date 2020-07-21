@@ -11,12 +11,18 @@ type Block struct {
 }
 
 type Config struct {
-	Version string `hcl:"version"`
-	Block   Block  `hcl:"block,block"`
+	Version string            `hcl:"version"`
+	Block   Block             `hcl:"block,block"`
+	Map     map[string]string `hcl:"map"`
 }
 
 const configSource = `
 version = "version-${commit}"
+
+map = {
+	commit: "${commit}",
+	"${commit}": "commit",
+}
 
 block "label-${commit}" {
 }
