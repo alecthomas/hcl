@@ -24,7 +24,7 @@ func Unmarshal(data []byte, v interface{}, vars map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	err = InterpolateEvalConfig(hclAST, &hil.EvalConfig{
+	err = Interpolate(hclAST, &hil.EvalConfig{
 		GlobalScope: &hilast.BasicScope{VarMap: hilVars},
 	})
 	if err != nil {
@@ -80,7 +80,7 @@ func ToHILVars(vars map[string]interface{}) (map[string]hilast.Variable, error) 
 }
 
 // Interpolate all string values in "node" using the given hil.EvalConfig.
-func InterpolateEvalConfig(node hcl.Node, config *hil.EvalConfig) error {
+func Interpolate(node hcl.Node, config *hil.EvalConfig) error {
 	// Interpolate into AST.
 	return hcl.Visit(node, func(node hcl.Node, next func() error) error {
 		switch node := node.(type) {
