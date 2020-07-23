@@ -28,15 +28,15 @@ func MarshalToAST(v interface{}) (*AST, error) {
 }
 
 // MarshalAST marshals an AST to HCL bytes.
-func MarshalAST(ast *AST) ([]byte, error) {
+func MarshalAST(ast Node) ([]byte, error) {
 	w := &bytes.Buffer{}
 	err := MarshalASTToWriter(ast, w)
 	return w.Bytes(), err
 }
 
 // MarshalASTToWriter marshals a hcl.AST to an io.Writer.
-func MarshalASTToWriter(ast *AST, w io.Writer) error {
-	return marshalEntries(w, "", ast.Entries)
+func MarshalASTToWriter(ast Node, w io.Writer) error {
+	return marshalNode(w, "", ast)
 }
 
 func marshalToAST(v interface{}, schema bool) (*AST, error) {
@@ -250,6 +250,30 @@ func sliceToBlocks(sv reflect.Value, tag tag) ([]*Block, error) {
 		blocks = append(blocks, block)
 	}
 	return blocks, nil
+}
+
+func marshalNode(w io.Writer, indent string, node Node) error {
+	switch node := node.(type) {
+	case *AST:
+		return marshalAST(w, indent, node)
+	case *Block:
+		return marshalBlock(w, indent, node)
+	case *Attribute:
+		return marshalAttribute(w, indent, node)
+	case *Value:
+		return marshalValue(w, indent, node)
+	default:
+		return fmt.Errorf("can't marshal node of type %T", node)
+	}
+}
+
+func marshalAST(w io.Writer, indent string, node *AST) error {
+	err := marshalEntries(w, indent, node.Entries)
+	if err != nil {
+		return err
+	}
+	marshalComments(w, indent, node.TrailingComments)
+	return nil
 }
 
 func marshalEntries(w io.Writer, indent string, entries []*Entry) error {
