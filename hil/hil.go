@@ -20,6 +20,24 @@ func Unmarshal(data []byte, v interface{}, vars map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
+	hilVars, err := ToHILVars(vars)
+	if err != nil {
+		return err
+	}
+	err = InterpolateEvalConfig(hclAST, &hil.EvalConfig{
+		GlobalScope: &hilast.BasicScope{VarMap: hilVars},
+	})
+	if err != nil {
+		return err
+	}
+	return hcl.UnmarshalAST(hclAST, v)
+}
+
+// ToHILVars converts a Go map to hashicorp/hil variables.
+//
+// Values in "vars" must be of type "int", "string", "map[string]interface{}"
+// or "[]interface{}".
+func ToHILVars(vars map[string]interface{}) (map[string]hilast.Variable, error) {
 	// Convert map into HIL variables.
 	hilVars := map[string]hilast.Variable{}
 	for key, value := range vars {
@@ -55,20 +73,14 @@ func Unmarshal(data []byte, v interface{}, vars map[string]interface{}) error {
 			}
 
 		default:
-			return fmt.Errorf("unsupported variable type %T for %q", value, key)
+			return nil, fmt.Errorf("unsupported variable type %T for %q", value, key)
 		}
 	}
-	err = Interpolate(hclAST, &hil.EvalConfig{
-		GlobalScope: &hilast.BasicScope{VarMap: hilVars},
-	})
-	if err != nil {
-		return err
-	}
-	return hcl.UnmarshalAST(hclAST, v)
+	return hilVars, nil
 }
 
 // Interpolate all string values in "node" using the given hil.EvalConfig.
-func Interpolate(node hcl.Node, config *hil.EvalConfig) error {
+func InterpolateEvalConfig(node hcl.Node, config *hil.EvalConfig) error {
 	// Interpolate into AST.
 	return hcl.Visit(node, func(node hcl.Node, next func() error) error {
 		switch node := node.(type) {
