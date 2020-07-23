@@ -4,6 +4,8 @@ github.com/alecthomas/hcl v0.1.1-0.20200720045213-fee42cb4f981 h1:FUS9p5O+KGb1hd
 github.com/alecthomas/hcl v0.1.1-0.20200720045213-fee42cb4f981/go.mod h1:bTbOZjKcPGuc7o4m7VjHmt0PpWZO70Xhagf3STdQgKs=
 github.com/alecthomas/hcl v0.1.1-0.20200721011101-3e489efdf0ad h1:fcfM3TtxkQnQhhFJ09MpU8J5guJ7BqXYRHghPC+Ml6o=
 github.com/alecthomas/hcl v0.1.1-0.20200721011101-3e489efdf0ad/go.mod h1:bTbOZjKcPGuc7o4m7VjHmt0PpWZO70Xhagf3STdQgKs=
+github.com/alecthomas/hcl v0.1.1-0.20200723030810-fa56972bbf92 h1:dP1KQGUnlUi+71UtFBWumDR/MGzbdQT9+CcfYDylY28=
+github.com/alecthomas/hcl v0.1.1-0.20200723030810-fa56972bbf92/go.mod h1:bTbOZjKcPGuc7o4m7VjHmt0PpWZO70Xhagf3STdQgKs=
 github.com/alecthomas/participle v0.4.3/go.mod h1:HfdmEuwvr12HXQN44HPWXR0lHmVolVYe4dyL6lQ3duY=
 github.com/alecthomas/participle v0.5.0 h1:tT0WyXKiXyzwoCaXCfFlJQjFo1p54xWg9ZccCYJURnE=
 github.com/alecthomas/participle v0.5.0/go.mod h1:HfdmEuwvr12HXQN44HPWXR0lHmVolVYe4dyL6lQ3duY=
