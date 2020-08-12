@@ -10,6 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestClone(t *testing.T) {
+	ast, err := ParseString(complexHCLExample)
+	require.NoError(t, err)
+	clone := ast.Clone()
+	require.Equal(t, ast, clone)
+}
+
 func TestParse(t *testing.T) {
 	tests := []struct {
 		name     string
