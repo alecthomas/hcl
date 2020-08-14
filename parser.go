@@ -23,11 +23,9 @@ type Node interface{ node() }
 type AST struct {
 	Pos lexer.Position `parser:"" json:"-"`
 
-	Entries []*Entry `parser:"@@*" json:"entries"`
-
+	Entries          []*Entry `parser:"@@*" json:"entries,omitempty"`
 	TrailingComments []string `parser:"@Comment*" json:"trailing_comments,omitempty"`
-
-	Schema bool `parser:"" json:"schema,omitempty"`
+	Schema           bool     `parser:"" json:"schema,omitempty"`
 }
 
 // Clone the AST.
@@ -44,6 +42,7 @@ func (a *AST) Clone() *AST {
 	for i, entry := range a.Entries {
 		out.Entries[i] = entry.Clone()
 	}
+	addParentRefs(nil, out)
 	return out
 }
 
@@ -51,7 +50,8 @@ func (*AST) node() {}
 
 // Entry at the top-level of a HCL file or block.
 type Entry struct {
-	Pos lexer.Position `parser:"" json:"-"`
+	Pos    lexer.Position `parser:"" json:"-"`
+	Parent Node           `parser:"" json:"-"`
 
 	Attribute *Attribute `parser:"(   @@" json:"attribute,omitempty"`
 	Block     *Block     `parser:"  | @@ )" json:"block,omitempty"`
@@ -87,7 +87,8 @@ func (e *Entry) Clone() *Entry {
 
 // Attribute is a key+value attribute.
 type Attribute struct {
-	Pos lexer.Position `parser:"" json:"-"`
+	Pos    lexer.Position `parser:"" json:"-"`
+	Parent Node           `parser:"" json:"-"`
 
 	Comments []string `parser:"@Comment*" json:"comments,omitempty"`
 
@@ -120,7 +121,8 @@ func (a *Attribute) Clone() *Attribute {
 
 // Block represents am optionally labelled HCL block.
 type Block struct {
-	Pos lexer.Position `parser:"" json:"-"`
+	Pos    lexer.Position `parser:"" json:"-"`
+	Parent Node           `parser:"" json:"-"`
 
 	Comments []string `parser:"@Comment*" json:"comments,omitempty"`
 
@@ -158,7 +160,8 @@ func (b *Block) Clone() *Block {
 
 // MapEntry represents a key+value in a map.
 type MapEntry struct {
-	Pos lexer.Position `parser:"" json:"-"`
+	Pos    lexer.Position `parser:"" json:"-"`
+	Parent Node           `parser:"" json:"-"`
 
 	Comments []string `parser:"@Comment*" json:"comments,omitempty"`
 
@@ -188,7 +191,8 @@ func (b *Bool) Capture(values []string) error { *b = values[0] == "true"; return
 
 // Value is a scalar, list or map.
 type Value struct {
-	Pos lexer.Position `parser:"" json:"-"`
+	Pos    lexer.Position `parser:"" json:"-"`
+	Parent Node           `parser:"" json:"-"`
 
 	Bool     *Bool       `parser:"(  @('true' | 'false')" json:"bool,omitempty"`
 	Number   *big.Float  `parser:" | @Number" json:"number,omitempty"`
@@ -290,19 +294,31 @@ func stripComment(token lexer.Token) (lexer.Token, error) {
 // Parse HCL from an io.Reader.
 func Parse(r io.Reader) (*AST, error) {
 	hcl := &AST{}
-	return hcl, parser.Parse(r, hcl)
+	err := parser.Parse(r, hcl)
+	if err != nil {
+		return nil, err
+	}
+	return hcl, AddParentRefs(hcl)
 }
 
 // ParseString parses HCL from a string.
 func ParseString(str string) (*AST, error) {
 	hcl := &AST{}
-	return hcl, parser.ParseString(str, hcl)
+	err := parser.ParseString(str, hcl)
+	if err != nil {
+		return nil, err
+	}
+	return hcl, AddParentRefs(hcl)
 }
 
 // ParseBytes parses HCL from bytes.
 func ParseBytes(data []byte) (*AST, error) {
 	hcl := &AST{}
-	return hcl, parser.ParseBytes(data, hcl)
+	err := parser.ParseBytes(data, hcl)
+	if err != nil {
+		return nil, err
+	}
+	return hcl, AddParentRefs(hcl)
 }
 
 func cloneStrings(strings []string) []string {

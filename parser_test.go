@@ -105,7 +105,9 @@ func TestParse(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				normaliseAST(hcl)
-				require.Equal(t, repr.String(test.expected, repr.Indent("  ")), repr.String(hcl, repr.Indent("  ")))
+				require.Equal(t,
+					repr.String(test.expected, repr.Indent("  ")),
+					repr.String(hcl, repr.Indent("  ")))
 			}
 		})
 	}
@@ -123,12 +125,15 @@ func normaliseAST(hcl *AST) *AST {
 
 func normaliseEntries(entries []*Entry) {
 	for _, entry := range entries {
+		entry.Parent = nil
 		entry.Pos = lexer.Position{}
 		if entry.Block != nil {
 			entry.Block.Pos = lexer.Position{}
+			entry.Block.Parent = nil
 			normaliseEntries(entry.Block.Body)
 		} else {
 			entry.Attribute.Pos = lexer.Position{}
+			entry.Attribute.Parent = nil
 			val := entry.Attribute.Value
 			normaliseValue(val)
 		}
@@ -137,8 +142,10 @@ func normaliseEntries(entries []*Entry) {
 
 func normaliseValue(val *Value) {
 	val.Pos = lexer.Position{}
+	val.Parent = nil
 	for _, entry := range val.Map {
 		entry.Pos = lexer.Position{}
+		entry.Parent = nil
 		normaliseValue(entry.Key)
 		normaliseValue(entry.Value)
 	}
