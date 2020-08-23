@@ -46,10 +46,12 @@ str = string
 num = number
 bool = boolean
 list = [string]
+
 // A map.
 map = {
   string: number,
 }
+
 // A block.
 block "name" {
   attr = string

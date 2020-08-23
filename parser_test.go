@@ -7,8 +7,22 @@ import (
 
 	"github.com/alecthomas/participle/lexer"
 	"github.com/alecthomas/repr"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestGetHeredoc(t *testing.T) {
+	value := &Value{
+		HeredocDelimiter: "-EOF",
+		Heredoc:          strp("\n    hello\n  world"),
+	}
+	require.Equal(t, "  hello\nworld", value.GetHeredoc())
+	value = &Value{
+		HeredocDelimiter: "EOF",
+		Heredoc:          strp("\n  hello\n  world"),
+	}
+	require.Equal(t, "  hello\n  world", value.GetHeredoc())
+}
 
 func TestClone(t *testing.T) {
 	ast, err := ParseString(complexHCLExample)
@@ -24,6 +38,43 @@ func TestParse(t *testing.T) {
 		fail     bool
 		expected *AST
 	}{
+		{name: "Heredoc",
+			hcl: `
+				doc = <<EOF
+some thing
+or another
+EOF
+			`,
+			expected: &AST{
+				Entries: []*Entry{
+					attr("doc", heredoc("EOF", "\nsome thing\nor another")),
+				},
+			},
+		},
+		{name: "IndentedHeredoc",
+			hcl: `
+				doc = <<-EOF
+some thing
+or another
+EOF
+			`,
+			expected: &AST{
+				Entries: []*Entry{
+					attr("doc", heredoc("-EOF", "\nsome thing\nor another")),
+				},
+			},
+		},
+		{name: "EmptyHeredoc",
+			hcl: `
+				doc = <<EOF
+EOF
+			`,
+			expected: &AST{
+				Entries: []*Entry{
+					attr("doc", &Value{HeredocDelimiter: "EOF"}),
+				},
+			},
+		},
 		{name: "Comments",
 			hcl: `
 				// A comment
@@ -101,16 +152,19 @@ func TestParse(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			hcl, err := ParseString(test.hcl)
 			if test.fail {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
+				assert.Error(t, err)
+			} else if assert.NoError(t, err) {
 				normaliseAST(hcl)
-				require.Equal(t,
+				assert.Equal(t,
 					repr.String(test.expected, repr.Indent("  ")),
 					repr.String(hcl, repr.Indent("  ")))
 			}
 		})
 	}
+}
+
+func heredoc(delim, s string) *Value {
+	return &Value{HeredocDelimiter: delim, Heredoc: &s}
 }
 
 func hbool(b bool) *Value {

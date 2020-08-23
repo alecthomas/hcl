@@ -24,6 +24,7 @@ linters:
     - nestif
     - goerr113
     - testpackage
+    - godot
 
 linters-settings:
   govet:

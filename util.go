@@ -2,6 +2,8 @@ package hcl
 
 import (
 	"fmt"
+	"strings"
+	"unicode"
 )
 
 // StripComments recursively from an AST node.
@@ -73,4 +75,29 @@ func addParentRefs(parent, node Node) {
 	default:
 		panic(fmt.Sprintf("%T", node))
 	}
+}
+
+func dedent(s string) string {
+	lines := strings.Split(s, "\n")
+	indent := whitespacePrefix(lines[0])
+	for _, line := range lines {
+		candidate := whitespacePrefix(line)
+		if len(candidate) < len(indent) {
+			indent = candidate
+		}
+	}
+	for i, line := range lines {
+		lines[i] = strings.TrimPrefix(line, indent)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func whitespacePrefix(s string) string {
+	indent := ""
+	for _, rn := range s {
+		if unicode.IsSpace(rn) {
+			indent += string(rn)
+		}
+	}
+	return indent
 }

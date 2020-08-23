@@ -12,7 +12,7 @@ import (
 
 	"github.com/alecthomas/participle"
 	"github.com/alecthomas/participle/lexer"
-	"github.com/alecthomas/participle/lexer/regex"
+	"github.com/alecthomas/participle/lexer/stateful"
 	"github.com/alecthomas/repr"
 )
 
@@ -194,14 +194,16 @@ type Value struct {
 	Pos    lexer.Position `parser:"" json:"-"`
 	Parent Node           `parser:"" json:"-"`
 
-	Bool     *Bool       `parser:"(  @('true' | 'false')" json:"bool,omitempty"`
-	Number   *big.Float  `parser:" | @Number" json:"number,omitempty"`
-	Type     *string     `parser:" | @('number':Ident | 'string':Ident | 'boolean':Ident)" json:"type,omitempty"`
-	Str      *string     `parser:" | @(String | Ident)" json:"str,omitempty"`
-	HaveList bool        `parser:" | ( @'['" json:"have_list,omitempty"` // Need this to detect empty lists.
-	List     []*Value    `parser:"     ( @@ ( ',' @@ )* )? ','? ']' )" json:"list,omitempty"`
-	HaveMap  bool        `parser:" | ( @'{'" json:"have_map,omitempty"` // Need this to detect empty maps.
-	Map      []*MapEntry `parser:"     ( @@ ( ',' @@ )* ','? )? '}' ) )" json:"map,omitempty"`
+	Bool             *Bool       `parser:"(  @('true' | 'false')" json:"bool,omitempty"`
+	Number           *big.Float  `parser:" | @Number" json:"number,omitempty"`
+	Type             *string     `parser:" | @('number':Ident | 'string':Ident | 'boolean':Ident)" json:"type,omitempty"`
+	Str              *string     `parser:" | @(String | Ident)" json:"str,omitempty"`
+	HeredocDelimiter string      `parser:" | (@Heredoc" json:"heredoc_delimiter,omitempty"`
+	Heredoc          *string     `parser:"     @(HeredocBody | HeredocEOL)* HeredocEnd)" json:"heredoc,omitempty"`
+	HaveList         bool        `parser:" | ( @'['" json:"have_list,omitempty"` // Need this to detect empty lists.
+	List             []*Value    `parser:"     ( @@ ( ',' @@ )* )? ','? ']' )" json:"list,omitempty"`
+	HaveMap          bool        `parser:" | ( @'{'" json:"have_map,omitempty"` // Need this to detect empty maps.
+	Map              []*MapEntry `parser:"     ( @@ ( ',' @@ )* ','? )? '}' ) )" json:"map,omitempty"`
 }
 
 // Clone the AST.
@@ -244,6 +246,13 @@ func (v *Value) String() string {
 	case v.Str != nil:
 		return fmt.Sprintf("%q", *v.Str)
 
+	case v.HeredocDelimiter != "":
+		heredoc := ""
+		if v.Heredoc != nil {
+			heredoc = *v.Heredoc
+		}
+		return fmt.Sprintf("<<%s%s\n%s", v.HeredocDelimiter, heredoc, v.HeredocDelimiter)
+
 	case v.HaveList:
 		entries := []string{}
 		for _, e := range v.List {
@@ -266,19 +275,45 @@ func (v *Value) String() string {
 	}
 }
 
-var (
-	lex = lexer.Must(regex.New(`
-		Ident = \b[[:alpha:]]\w*(-\w+)*\b
-		Number = \b^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?\b
-		String = "(\\\d\d\d|\\.|[^"])*"
-		Punct = [][{}=:,]
-		Comment = //[^\n]*|/\*.*?\*/
+// GetHeredoc gets the heredoc as a string.
+//
+// This will correctly format indented heredocs.
+func (v *Value) GetHeredoc() string {
+	if v == nil {
+		return ""
+	}
+	heredoc := ""
+	if v.Heredoc != nil {
+		// The [1:] here removes a \n lexing artifact.
+		heredoc = (*v.Heredoc)[1:]
+	}
+	if v.HeredocDelimiter[0] != '-' {
+		return heredoc
+	}
+	return dedent(heredoc)
+}
 
-		whitespace = \s+
-	`))
+var (
+	lex = lexer.Must(stateful.New(stateful.Rules{
+		"Root": {
+			{"Ident", `\b[[:alpha:]]\w*(-\w+)*\b`, nil},
+			{"Number", `\b^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?\b`, nil},
+			{"Heredoc", `<<[-]?(\w+\b)`, stateful.Push("Heredoc")},
+			{"String", `"(\\\d\d\d|\\.|[^"])*"`, nil},
+			{"Punct", `[][{}=:,]`, nil},
+			{"Comment", `//[^\n]*|/\*.*?\*/`, nil},
+			{"whitespace", `\s+`, nil},
+		},
+		"Heredoc": {
+			{"End", `\n\b\1\b`, stateful.Pop()},
+			{"EOL", `\n`, nil},
+			{"Body", `[^\n]+`, nil},
+		},
+	}))
 	parser = participle.MustBuild(&AST{},
 		participle.Lexer(lex),
-		participle.Unquote(),
+		participle.Unquote("String"),
+		participle.Map(cleanHeredocStart, "Heredoc"),
 		participle.Map(stripComment, "Comment"),
 		// We need lookahead to ensure prefixed comments are associated with the right nodes.
 		participle.UseLookahead(50))
@@ -288,6 +323,12 @@ var stripCommentRe = regexp.MustCompile(`^//\s*|^/\*|\*/$`)
 
 func stripComment(token lexer.Token) (lexer.Token, error) {
 	token.Value = stripCommentRe.ReplaceAllString(token.Value, "")
+	return token, nil
+}
+
+// <<EOF -> EOF
+func cleanHeredocStart(token lexer.Token) (lexer.Token, error) {
+	token.Value = token.Value[2:]
 	return token, nil
 }
 

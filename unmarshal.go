@@ -264,6 +264,8 @@ func unmarshalValue(rv reflect.Value, v *Value) error {
 			rv.SetString(*v.Str)
 		case v.Type != nil:
 			rv.SetString(*v.Type)
+		case v.HeredocDelimiter != "":
+			rv.SetString(v.GetHeredoc())
 		default:
 			return fmt.Errorf("expected a type or string but got %s", v)
 		}
