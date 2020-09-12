@@ -199,7 +199,7 @@ type Value struct {
 	Type             *string     `parser:" | @('number':Ident | 'string':Ident | 'boolean':Ident)" json:"type,omitempty"`
 	Str              *string     `parser:" | @(String | Ident)" json:"str,omitempty"`
 	HeredocDelimiter string      `parser:" | (@Heredoc" json:"heredoc_delimiter,omitempty"`
-	Heredoc          *string     `parser:"     @(HeredocBody | HeredocEOL)* HeredocEnd)" json:"heredoc,omitempty"`
+	Heredoc          *string     `parser:"     @(Body | EOL)* End)" json:"heredoc,omitempty"`
 	HaveList         bool        `parser:" | ( @'['" json:"have_list,omitempty"` // Need this to detect empty lists.
 	List             []*Value    `parser:"     ( @@ ( ',' @@ )* )? ','? ']' )" json:"list,omitempty"`
 	HaveMap          bool        `parser:" | ( @'{'" json:"have_map,omitempty"` // Need this to detect empty maps.

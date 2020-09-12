@@ -11,6 +11,7 @@ import (
 
 // MarshalJSONOptions controls how custom JSON marshaling is applied.
 type MarshalJSONOptions struct {
+	// Include comments as JSON attributes.
 	Comments bool
 }
 
