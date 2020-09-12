@@ -301,7 +301,7 @@ var (
 			{"Heredoc", `<<[-]?(\w+\b)`, stateful.Push("Heredoc")},
 			{"String", `"(\\\d\d\d|\\.|[^"])*"`, nil},
 			{"Punct", `[][{}=:,]`, nil},
-			{"Comment", `//[^\n]*|/\*.*?\*/`, nil},
+			{"Comment", `(?:(?://|#)[^\n]*)|/\*.*?\*/`, nil},
 			{"whitespace", `\s+`, nil},
 		},
 		"Heredoc": {
