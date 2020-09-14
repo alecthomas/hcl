@@ -406,7 +406,7 @@ func parseTag(parent reflect.Type, t reflect.StructField) tag {
 	if !ok {
 		s, ok = t.Tag.Lookup("json")
 		if !ok {
-			return tag{name: t.Name, help: help}
+			return tag{name: t.Name, optional: true, help: help}
 		}
 	}
 	parts := strings.Split(s, ",")
