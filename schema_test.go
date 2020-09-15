@@ -15,8 +15,8 @@ type testSchema struct {
 	List  []string       `hcl:"list"`
 	Map   map[string]int `hcl:"map" help:"A map."`
 	Block struct {
-		Name string `hcl:"name,label"`
-		Attr string `hcl:"attr"`
+		Name string  `hcl:"name,label"`
+		Attr *string `hcl:"attr"`
 	} `hcl:"block,block" help:"A block."`
 	BlockSlice []struct {
 		Label0 string `hcl:"label0,label"`

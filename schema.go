@@ -89,8 +89,11 @@ func attrSchema(t reflect.Type) (*Value, error) {
 	case reflect.Struct:
 		panic("struct " + t.String() + " used as attribute, is it missing a \"block\" tag?")
 
+	case reflect.Ptr:
+		return attrSchema(t.Elem())
+
 	default:
-		panic(t.String())
+		panic(fmt.Sprintf("unsupported attribute type %s during schema reflection", t))
 	}
 }
 
