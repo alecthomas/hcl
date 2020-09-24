@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/participle"
+	"github.com/alecthomas/participle/lexer"
 )
 
 var (
@@ -56,7 +57,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 		return fmt.Errorf("%T must be a struct", v.Interface())
 	}
 	// Collect entries from the source into a map.
-	seen := map[string]bool{}
+	seen := map[string]*Entry{}
 	mentries := make(map[string][]*Entry, len(entries))
 	for _, entry := range entries {
 		key := entry.Key()
@@ -68,7 +69,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 			}
 		}
 		mentries[key] = append(mentries[key], entry)
-		seen[key] = true
+		seen[key] = entry
 	}
 	// Collect the fields of the target struct.
 	fields, err := flattenFields(v)
@@ -101,7 +102,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 			return nil
 		}
 
-		haventSeen := !seen[tag.name]
+		haventSeen := seen[tag.name] == nil
 		entries := mentries[tag.name]
 		if len(entries) == 0 {
 			if !tag.optional && haventSeen {
@@ -221,10 +222,14 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 
 	if len(seen) > 0 {
 		need := []string{}
-		for key := range seen {
+		var pos *lexer.Position
+		for key, entry := range seen {
+			if pos == nil {
+				pos = &entry.Pos
+			}
 			need = append(need, strconv.Quote(key))
 		}
-		return fmt.Errorf("found extra fields %s", strings.Join(need, ", "))
+		return participle.Errorf(*pos, "found extra fields %s", strings.Join(need, ", "))
 	}
 	return nil
 }
