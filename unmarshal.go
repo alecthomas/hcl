@@ -193,7 +193,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 					el := reflect.New(elt).Elem()
 					err := unmarshalBlock(el, entry.Block)
 					if err != nil {
-						return participle.Errorf(entry.Pos, "%s", err)
+						return participle.AnnotateError(entry.Pos, err)
 					}
 					if ptr {
 						el = el.Addr()
@@ -237,7 +237,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 func unmarshalBlock(v reflect.Value, block *Block) error {
 	fields, err := flattenFields(v)
 	if err != nil {
-		return err
+		return participle.AnnotateError(block.Pos, err)
 	}
 	labels := block.Labels
 	for _, field := range fields {
@@ -272,33 +272,33 @@ func unmarshalValue(rv reflect.Value, v *Value) error {
 		case v.HeredocDelimiter != "":
 			rv.SetString(v.GetHeredoc())
 		default:
-			return fmt.Errorf("expected a type or string but got %s", v)
+			return participle.Errorf(v.Pos, "expected a type or string but got %s", v)
 		}
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if v.Number == nil {
-			return fmt.Errorf("expected a number but got %s", v)
+			return participle.Errorf(v.Pos, "expected a number but got %s", v)
 		}
 		n, _ := v.Number.Int64()
 		rv.SetInt(n)
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		if v.Number == nil {
-			return fmt.Errorf("expected a number but got %s", v)
+			return participle.Errorf(v.Pos, "expected a number but got %s", v)
 		}
 		n, _ := v.Number.Uint64()
 		rv.SetUint(n)
 
 	case reflect.Float32, reflect.Float64:
 		if v.Number == nil {
-			return fmt.Errorf("expected a number but got %s", v)
+			return participle.Errorf(v.Pos, "expected a number but got %s", v)
 		}
 		n, _ := v.Number.Float64()
 		rv.SetFloat(n)
 
 	case reflect.Map:
 		if !v.HaveMap {
-			return fmt.Errorf("expected a map but got %s", v)
+			return participle.Errorf(v.Pos, "expected a map but got %s", v)
 		}
 		t := rv.Type()
 		if t.Key().Kind() != reflect.String {
@@ -348,7 +348,7 @@ func unmarshalValue(rv reflect.Value, v *Value) error {
 
 	case reflect.Bool:
 		if v.Bool == nil {
-			return fmt.Errorf("expected a bool but got %s", v)
+			return participle.Errorf(v.Pos, "expected a bool but got %s", v)
 		}
 		rv.SetBool(bool(*v.Bool))
 
