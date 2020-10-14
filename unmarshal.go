@@ -24,35 +24,48 @@ var (
 	timeType                 = reflect.TypeOf(time.Time{})
 )
 
+type unmarshalOptions struct{}
+
+// UnmarshalOption configures optional unmarshalling behaviour.
+type UnmarshalOption func(options *unmarshalOptions)
+
 // Unmarshal HCL into a Go struct.
-func Unmarshal(data []byte, v interface{}) error {
+func Unmarshal(data []byte, v interface{}, options ...UnmarshalOption) error {
 	ast, err := ParseBytes(data)
 	if err != nil {
 		return err
 	}
-	return UnmarshalAST(ast, v)
+	return UnmarshalAST(ast, v, options...)
 }
 
-// UnmarshalAST unmarshals an already parsed or constructed AST into a Go struct.
-func UnmarshalAST(ast *AST, v interface{}) error {
+// UnmarshalAST unmarshalls an already parsed or constructed AST into a Go struct.
+func UnmarshalAST(ast *AST, v interface{}, options ...UnmarshalOption) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr {
 		return fmt.Errorf("%T must be a pointer", v)
 	}
-	return unmarshalEntries(rv.Elem(), ast.Entries)
+	opt := &unmarshalOptions{}
+	for _, option := range options {
+		option(opt)
+	}
+	return unmarshalEntries(rv.Elem(), ast.Entries, opt)
 }
 
 // UnmarshalBlock into a struct.
-func UnmarshalBlock(block *Block, v interface{}) error {
+func UnmarshalBlock(block *Block, v interface{}, options ...UnmarshalOption) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("%T must be a pointer to a struct", v)
 	}
 	rv = rv.Elem()
-	return unmarshalBlock(rv, block)
+	opt := &unmarshalOptions{}
+	for _, option := range options {
+		option(opt)
+	}
+	return unmarshalBlock(rv, block, opt)
 }
 
-func unmarshalEntries(v reflect.Value, entries []*Entry) error {
+func unmarshalEntries(v reflect.Value, entries []*Entry, opt *unmarshalOptions) error {
 	if v.Kind() != reflect.Struct {
 		return fmt.Errorf("%T must be a struct", v.Interface())
 	}
@@ -169,7 +182,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 			if entry.Attribute != nil {
 				return participle.Errorf(entry.Pos, "expected a block for %q but got an attribute", tag.name)
 			}
-			err := unmarshalBlock(field.v, entry.Block)
+			err := unmarshalBlock(field.v, entry.Block, opt)
 			if err != nil {
 				return participle.AnnotateError(entry.Pos, err)
 			}
@@ -191,7 +204,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 						return participle.Errorf(entry.Pos, "expected a block for %q but got an attribute", tag.name)
 					}
 					el := reflect.New(elt).Elem()
-					err := unmarshalBlock(el, entry.Block)
+					err := unmarshalBlock(el, entry.Block, opt)
 					if err != nil {
 						return participle.AnnotateError(entry.Pos, err)
 					}
@@ -234,7 +247,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry) error {
 	return nil
 }
 
-func unmarshalBlock(v reflect.Value, block *Block) error {
+func unmarshalBlock(v reflect.Value, block *Block, opt *unmarshalOptions) error {
 	fields, err := flattenFields(v)
 	if err != nil {
 		return participle.AnnotateError(block.Pos, err)
@@ -258,7 +271,7 @@ func unmarshalBlock(v reflect.Value, block *Block) error {
 	if len(labels) > 0 {
 		return participle.Errorf(block.Pos, "too many labels for block %q", block.Name)
 	}
-	return unmarshalEntries(v, block.Body)
+	return unmarshalEntries(v, block.Body, opt)
 }
 
 func unmarshalValue(rv reflect.Value, v *Value) error {
