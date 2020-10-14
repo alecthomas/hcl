@@ -24,13 +24,8 @@ var (
 	timeType                 = reflect.TypeOf(time.Time{})
 )
 
-type unmarshalOptions struct{}
-
-// UnmarshalOption configures optional unmarshalling behaviour.
-type UnmarshalOption func(options *unmarshalOptions)
-
 // Unmarshal HCL into a Go struct.
-func Unmarshal(data []byte, v interface{}, options ...UnmarshalOption) error {
+func Unmarshal(data []byte, v interface{}, options ...MarshalOption) error {
 	ast, err := ParseBytes(data)
 	if err != nil {
 		return err
@@ -39,12 +34,12 @@ func Unmarshal(data []byte, v interface{}, options ...UnmarshalOption) error {
 }
 
 // UnmarshalAST unmarshalls an already parsed or constructed AST into a Go struct.
-func UnmarshalAST(ast *AST, v interface{}, options ...UnmarshalOption) error {
+func UnmarshalAST(ast *AST, v interface{}, options ...MarshalOption) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr {
 		return fmt.Errorf("%T must be a pointer", v)
 	}
-	opt := &unmarshalOptions{}
+	opt := &marshalOptions{}
 	for _, option := range options {
 		option(opt)
 	}
@@ -52,20 +47,20 @@ func UnmarshalAST(ast *AST, v interface{}, options ...UnmarshalOption) error {
 }
 
 // UnmarshalBlock into a struct.
-func UnmarshalBlock(block *Block, v interface{}, options ...UnmarshalOption) error {
+func UnmarshalBlock(block *Block, v interface{}, options ...MarshalOption) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("%T must be a pointer to a struct", v)
 	}
 	rv = rv.Elem()
-	opt := &unmarshalOptions{}
+	opt := &marshalOptions{}
 	for _, option := range options {
 		option(opt)
 	}
 	return unmarshalBlock(rv, block, opt)
 }
 
-func unmarshalEntries(v reflect.Value, entries []*Entry, opt *unmarshalOptions) error {
+func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalOptions) error {
 	if v.Kind() != reflect.Struct {
 		return fmt.Errorf("%T must be a struct", v.Interface())
 	}
@@ -91,7 +86,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *unmarshalOptions) 
 	}
 	// Apply HCL entries to our fields.
 	for _, field := range fields {
-		tag := parseTag(v.Type(), field.t) // nolint: govet
+		tag := parseTag(v.Type(), field, opt) // nolint: govet
 		switch {
 		case tag.name == "":
 			continue
@@ -247,14 +242,14 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *unmarshalOptions) 
 	return nil
 }
 
-func unmarshalBlock(v reflect.Value, block *Block, opt *unmarshalOptions) error {
+func unmarshalBlock(v reflect.Value, block *Block, opt *marshalOptions) error {
 	fields, err := flattenFields(v)
 	if err != nil {
 		return participle.AnnotateError(block.Pos, err)
 	}
 	labels := block.Labels
 	for _, field := range fields {
-		tag := parseTag(v.Type(), field.t) // nolint: govet
+		tag := parseTag(v.Type(), field, opt) // nolint: govet
 		if tag.name == "" || !tag.label {
 			continue
 		}
@@ -418,13 +413,24 @@ func (t tag) comments() []string {
 	return nil
 }
 
-func parseTag(parent reflect.Type, t reflect.StructField) tag {
+func parseTag(parent reflect.Type, f field, opt *marshalOptions) tag {
+	t := f.t
 	help := t.Tag.Get("help")
 	s, ok := t.Tag.Lookup("hcl")
+	var isBlock bool
 	if !ok {
 		s, ok = t.Tag.Lookup("json")
 		if !ok {
 			return tag{name: t.Name, optional: true, help: help}
+		}
+
+		if opt.InferHCLTags {
+			// if the struct field is a struct or pointer to struct set the tag as block
+			tt := t.Type
+			for tt.Kind() == reflect.Ptr {
+				tt = tt.Elem()
+			}
+			isBlock = tt.Kind() == reflect.Struct
 		}
 	}
 	parts := strings.Split(s, ",")
@@ -437,12 +443,12 @@ func parseTag(parent reflect.Type, t reflect.StructField) tag {
 		name = t.Name
 	}
 	if len(parts) == 1 {
-		return tag{name: name, help: help}
+		return tag{name: name, block: isBlock, help: help}
 	}
 	option := parts[1]
 	switch option {
 	case "optional", "omitempty":
-		return tag{name: name, optional: true, help: help}
+		return tag{name: name, block: isBlock, optional: true, help: help}
 	case "label":
 		return tag{name: name, label: true, help: help}
 	case "block":

@@ -13,9 +13,37 @@ import (
 	"time"
 )
 
+// marshalOptions defines options for the marshalling/unmarshalling process
+type marshalOptions struct {
+	InferHCLTags bool
+}
+
+// MarshalOption configures optional unmarshalling behaviour.
+type MarshalOption func(options *marshalOptions)
+
+// InferHCLTags specifies whether to infer HCL tags from a json tag. In the future other type of tags can be supported
+func InferHCLTags(v bool) MarshalOption {
+	return func(options *marshalOptions) {
+		options.InferHCLTags = v
+	}
+}
+
+// newMarshalOptions creates marshal options from a set of options
+func newMarshalOptions(options ...MarshalOption) *marshalOptions {
+	opt := &marshalOptions{}
+	for _, option := range options {
+		option(opt)
+	}
+	return opt
+}
+
 // Marshal a Go type to HCL.
-func Marshal(v interface{}) ([]byte, error) {
-	ast, err := MarshalToAST(v)
+func Marshal(v interface{}, options ...MarshalOption) ([]byte, error) {
+	opt := &marshalOptions{}
+	for _, option := range options {
+		option(opt)
+	}
+	ast, err := MarshalToAST(v, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -23,8 +51,8 @@ func Marshal(v interface{}) ([]byte, error) {
 }
 
 // MarshalToAST marshals a Go type to a hcl.AST.
-func MarshalToAST(v interface{}) (*AST, error) {
-	return marshalToAST(v, false)
+func MarshalToAST(v interface{}, options ...MarshalOption) (*AST, error) {
+	return marshalToAST(v, false, newMarshalOptions(options...))
 }
 
 // MarshalAST marshals an AST to HCL bytes.
@@ -39,7 +67,7 @@ func MarshalASTToWriter(ast Node, w io.Writer) error {
 	return marshalNode(w, "", ast)
 }
 
-func marshalToAST(v interface{}, schema bool) (*AST, error) {
+func marshalToAST(v interface{}, schema bool, opt *marshalOptions) (*AST, error) {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr {
 		return nil, fmt.Errorf("expected a pointer to a struct, not %T", v)
@@ -55,7 +83,7 @@ func marshalToAST(v interface{}, schema bool) (*AST, error) {
 			Schema: schema,
 		}
 	)
-	ast.Entries, labels, err = structToEntries(rv, schema)
+	ast.Entries, labels, err = structToEntries(rv, schema, opt)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +93,7 @@ func marshalToAST(v interface{}, schema bool) (*AST, error) {
 	return ast, nil
 }
 
-func structToEntries(v reflect.Value, schema bool) (entries []*Entry, labels []string, err error) {
+func structToEntries(v reflect.Value, schema bool, opt *marshalOptions) (entries []*Entry, labels []string, err error) {
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
 			if !schema {
@@ -80,7 +108,7 @@ func structToEntries(v reflect.Value, schema bool) (entries []*Entry, labels []s
 		return nil, nil, err
 	}
 	for _, field := range fields {
-		tag := parseTag(v.Type(), field.t)
+		tag := parseTag(v.Type(), field, opt)
 		switch {
 		case tag.label:
 			if schema {
@@ -93,13 +121,13 @@ func structToEntries(v reflect.Value, schema bool) (entries []*Entry, labels []s
 			if field.v.Kind() == reflect.Slice {
 				var blocks []*Block
 				if schema {
-					block, err := sliceToBlockSchema(field.v.Type(), tag)
+					block, err := sliceToBlockSchema(field.v.Type(), tag, opt)
 					if err == nil {
 						block.Repeated = true
 						blocks = append(blocks, block)
 					}
 				} else {
-					blocks, err = sliceToBlocks(field.v, tag)
+					blocks, err = sliceToBlocks(field.v, tag, opt)
 				}
 				if err != nil {
 					return nil, nil, err
@@ -108,7 +136,7 @@ func structToEntries(v reflect.Value, schema bool) (entries []*Entry, labels []s
 					entries = append(entries, &Entry{Block: block})
 				}
 			} else {
-				block, err := valueToBlock(field.v, tag, schema)
+				block, err := valueToBlock(field.v, tag, schema, opt)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -230,20 +258,20 @@ func valueToValue(v reflect.Value) (*Value, error) {
 	}
 }
 
-func valueToBlock(v reflect.Value, tag tag, schema bool) (*Block, error) {
+func valueToBlock(v reflect.Value, tag tag, schema bool, opt *marshalOptions) (*Block, error) {
 	block := &Block{
 		Name:     tag.name,
 		Comments: tag.comments(),
 	}
 	var err error
-	block.Body, block.Labels, err = structToEntries(v, schema)
+	block.Body, block.Labels, err = structToEntries(v, schema, opt)
 	return block, err
 }
 
-func sliceToBlocks(sv reflect.Value, tag tag) ([]*Block, error) {
+func sliceToBlocks(sv reflect.Value, tag tag, opt *marshalOptions) ([]*Block, error) {
 	blocks := []*Block{}
 	for i := 0; i != sv.Len(); i++ {
-		block, err := valueToBlock(sv.Index(i), tag, false)
+		block, err := valueToBlock(sv.Index(i), tag, false, opt)
 		if err != nil {
 			return nil, err
 		}

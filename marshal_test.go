@@ -83,6 +83,7 @@ func TestMarshal(t *testing.T) {
 		name     string
 		src      interface{}
 		expected string
+		options  []MarshalOption
 	}{
 		{name: "Scalars",
 			src: &struct {
@@ -145,10 +146,27 @@ text = "hello"
 json = "{\"hello\":\"world\"}"
 `,
 		},
+		{name: "JsonTags",
+			src: &struct {
+				Block struct {
+					Str string `json:"str"`
+				} `json:"block"`
+			}{
+				Block: struct {
+					Str string `json:"str"`
+				}{Str: "val"},
+			},
+			expected: `
+block {
+  str = "val"
+}
+`,
+			options: []MarshalOption{InferHCLTags(true)},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			data, err := Marshal(test.src)
+			data, err := Marshal(test.src, test.options...)
 			require.NoError(t, err)
 			require.Equal(t, strings.TrimSpace(test.expected), strings.TrimSpace(string(data)))
 		})
