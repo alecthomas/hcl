@@ -15,16 +15,18 @@ import (
 
 // marshalOptions defines options for the marshalling/unmarshalling process
 type marshalOptions struct {
-	InferHCLTags bool
+	inferHCLTags bool
 }
 
-// MarshalOption configures optional unmarshalling behaviour.
+// MarshalOption configures optional marshalling behaviour.
 type MarshalOption func(options *marshalOptions)
 
-// InferHCLTags specifies whether to infer HCL tags from a json tag. In the future other type of tags can be supported
+// InferHCLTags specifies whether to infer behaviour if hcl:"" tags are not present.
+//
+// This currently just means that all structs become blocks.
 func InferHCLTags(v bool) MarshalOption {
 	return func(options *marshalOptions) {
-		options.InferHCLTags = v
+		options.inferHCLTags = v
 	}
 }
 

@@ -417,20 +417,21 @@ func parseTag(parent reflect.Type, f field, opt *marshalOptions) tag {
 	t := f.t
 	help := t.Tag.Get("help")
 	s, ok := t.Tag.Lookup("hcl")
-	var isBlock bool
+
+	isBlock := false
+	if !ok && opt.inferHCLTags {
+		// if the struct field is a struct or pointer to struct set the tag as block
+		tt := t.Type
+		for tt.Kind() == reflect.Ptr {
+			tt = tt.Elem()
+		}
+		isBlock = tt.Kind() == reflect.Struct
+	}
+
 	if !ok {
 		s, ok = t.Tag.Lookup("json")
 		if !ok {
-			return tag{name: t.Name, optional: true, help: help}
-		}
-
-		if opt.InferHCLTags {
-			// if the struct field is a struct or pointer to struct set the tag as block
-			tt := t.Type
-			for tt.Kind() == reflect.Ptr {
-				tt = tt.Elem()
-			}
-			isBlock = tt.Kind() == reflect.Struct
+			return tag{name: t.Name, block: isBlock, optional: true, help: help}
 		}
 	}
 	parts := strings.Split(s, ",")
