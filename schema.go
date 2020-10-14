@@ -8,8 +8,8 @@ import (
 // Schema reflects a schema from a Go value.
 //
 // A schema is itself HCL.
-func Schema(v interface{}) (*AST, error) {
-	ast, err := marshalToAST(v, true)
+func Schema(v interface{}, options ...MarshalOption) (*AST, error) {
+	ast, err := marshalToAST(v, true, newMarshalOptions(options...))
 	if err != nil {
 		return nil, err
 	}
@@ -17,8 +17,8 @@ func Schema(v interface{}) (*AST, error) {
 }
 
 // MustSchema constructs a schema from a Go type, or panics.
-func MustSchema(v interface{}) *AST {
-	ast, err := Schema(v)
+func MustSchema(v interface{}, options ...MarshalOption) *AST {
+	ast, err := Schema(v, options...)
 	if err != nil {
 		panic(err)
 	}
@@ -26,12 +26,12 @@ func MustSchema(v interface{}) *AST {
 }
 
 // BlockSchema reflects a block schema for a Go struct.
-func BlockSchema(name string, v interface{}) (*AST, error) {
+func BlockSchema(name string, v interface{}, options ...MarshalOption) (*AST, error) {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Struct {
 		return nil, fmt.Errorf("expected a pointer to a struct not %T", v)
 	}
-	block, err := valueToBlock(rv.Elem(), tag{name: name, block: true}, true)
+	block, err := valueToBlock(rv.Elem(), tag{name: name, block: true}, true, newMarshalOptions(options...))
 	if err != nil {
 		return nil, err
 	}
@@ -42,8 +42,8 @@ func BlockSchema(name string, v interface{}) (*AST, error) {
 }
 
 // MustBlockSchema reflects a block schema from a Go struct, panicking if an error occurs.
-func MustBlockSchema(name string, v interface{}) *AST {
-	ast, err := BlockSchema(name, v)
+func MustBlockSchema(name string, v interface{}, options ...MarshalOption) *AST {
+	ast, err := BlockSchema(name, v, options...)
 	if err != nil {
 		panic(err)
 	}
@@ -97,13 +97,13 @@ func attrSchema(t reflect.Type) (*Value, error) {
 	}
 }
 
-func sliceToBlockSchema(t reflect.Type, tag tag) (*Block, error) {
+func sliceToBlockSchema(t reflect.Type, tag tag, opt *marshalOptions) (*Block, error) {
 	block := &Block{
 		Name:     tag.name,
 		Comments: tag.comments(),
 		Repeated: true,
 	}
 	var err error
-	block.Body, block.Labels, err = structToEntries(reflect.New(t.Elem()).Elem(), true)
+	block.Body, block.Labels, err = structToEntries(reflect.New(t.Elem()).Elem(), true, opt)
 	return block, err
 }

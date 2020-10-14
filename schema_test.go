@@ -188,3 +188,41 @@ block "label" {
 `),
 		strings.TrimSpace(string(data)))
 }
+
+func TestJsonTaggedSchema(t *testing.T) {
+	type KeyValue struct {
+		Key   string `json:"key"`
+		Value string `json:"value,omitempty"`
+	}
+
+	type jsonTaggedSchema struct {
+		Str     string    `json:"str"`
+		Config  KeyValue  `json:"config"`
+		Options *KeyValue `json:"options,omitempty"`
+	}
+
+	var val interface{}
+	val = &jsonTaggedSchema{
+		Str:     "testSchema",
+		Config:  KeyValue{"key1", "val1"},
+		Options: &KeyValue{},
+	}
+	schema, err := Schema(val, InferHCLTags(true))
+	require.NoError(t, err)
+	data, err := MarshalAST(schema)
+	require.NoError(t, err)
+	expectedSchema := `
+str = string
+
+config {
+  key = string
+  value = string // (optional)
+}
+
+options {
+  key = string
+  value = string // (optional)
+}
+    `
+	require.Equal(t, strings.TrimSpace(expectedSchema), strings.TrimSpace(string(data)))
+}

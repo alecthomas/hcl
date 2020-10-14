@@ -35,14 +35,18 @@ func TestUnmarshal(t *testing.T) {
 		Name string `hcl:"name,label"`
 		Attr string `hcl:"attr"`
 	}
+	type jsonStrBlock struct {
+		Str string `json:"str"`
+	}
 	timestamp, err := time.Parse(time.RFC3339, "2020-01-02T15:04:05Z")
 	require.NoError(t, err)
 	tests := []struct {
-		name  string
-		hcl   string
-		dest  interface{}
-		fail  string
-		fixup func(interface{}) // fixup unmarshalled structs
+		name    string
+		hcl     string
+		dest    interface{}
+		fail    string
+		fixup   func(interface{}) // fixup unmarshalled structs
+		options []MarshalOption
 	}{
 		{name: "Embed",
 			hcl: `
@@ -310,12 +314,25 @@ are = true
 				normaliseEntries(i.(*remainStruct).Remain)
 			},
 		},
+		{name: "Unmarshall json tagged struct",
+			hcl: `
+                block {
+                    str = "str"
+                }
+            `,
+			dest: struct {
+				Block jsonStrBlock `json:"block,omitempty"`
+			}{
+				Block: jsonStrBlock{Str: "str"},
+			},
+			options: []MarshalOption{InferHCLTags(true)},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			rv := reflect.New(reflect.TypeOf(test.dest))
 			actual := rv.Interface()
-			err := Unmarshal([]byte(test.hcl), actual)
+			err := Unmarshal([]byte(test.hcl), actual, test.options...)
 			if test.fail != "" {
 				require.EqualError(t, err, test.fail)
 			} else {
