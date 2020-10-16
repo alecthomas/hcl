@@ -9,8 +9,11 @@ import (
 	"math/big"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/alecthomas/participle/lexer"
 )
 
 // marshalOptions defines options for the marshalling/unmarshalling process
@@ -145,12 +148,16 @@ func structToEntries(v reflect.Value, schema bool, opt *marshalOptions) (entries
 				entries = append(entries, &Entry{Block: block})
 			}
 
-		case tag.optional && field.v.IsZero() && !schema:
-
 		default:
 			attr, err := fieldToAttr(field, tag, schema)
 			if err != nil {
 				return nil, nil, err
+			}
+			hasDefaultAndEqualsValue := attr.DefaultValue != nil && attr.Value.String() == attr.DefaultValue.String()
+			noDefaultButIsZero := attr.DefaultValue == nil && field.v.IsZero()
+			valueEqualsDefault := noDefaultButIsZero || hasDefaultAndEqualsValue
+			if tag.optional && !schema && valueEqualsDefault {
+				continue
 			}
 			entries = append(entries, &Entry{Attribute: attr})
 		}
@@ -169,8 +176,132 @@ func fieldToAttr(field field, tag tag, schema bool) (*Attribute, error) {
 	} else {
 		attr.Value, err = valueToValue(field.v)
 	}
-	attr.Optional = tag.optional && schema
+	if err != nil {
+		return nil, err
+	}
+	attr.DefaultValue, err = defaultValueFromTag(field, tag.defaultValue)
+	attr.Optional = (tag.optional || attr.DefaultValue != nil) && schema
 	return attr, err
+}
+
+func defaultValueFromTag(f field, defaultValue string) (*Value, error) {
+	if defaultValue == "" {
+		return nil, nil
+	}
+
+	k := f.v.Kind()
+	if k == reflect.Ptr {
+		k = f.v.Elem().Kind()
+	}
+
+	switch k {
+	case reflect.String:
+		return &Value{Str: &defaultValue}, nil
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		n, err := strconv.ParseInt(defaultValue, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("error converting default value %q to int", defaultValue)
+		}
+		return &Value{
+			Number: big.NewFloat(0).SetInt64(n),
+		}, nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		n, err := strconv.ParseUint(defaultValue, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("error converting default value %q to uint", defaultValue)
+		}
+		return &Value{
+			Number: big.NewFloat(0).SetUint64(n),
+		}, nil
+	case reflect.Float32, reflect.Float64:
+		n, err := strconv.ParseFloat(defaultValue, 10)
+		if err != nil {
+			return nil, fmt.Errorf("error converting default value %q to float", defaultValue)
+		}
+		return &Value{
+			Number: big.NewFloat(n),
+		}, nil
+	case reflect.Bool:
+		b, err := strconv.ParseBool(defaultValue)
+		if err != nil {
+			return nil, fmt.Errorf("error converting default value %q to bool", defaultValue)
+		}
+		v := Bool(b)
+		return &Value{
+			Bool: &v,
+		}, nil
+	case reflect.Map:
+		mapEntries := []*MapEntry{}
+		entries := strings.Split(defaultValue, ";")
+		mEntries := make(map[string]*MapEntry)
+		keys := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			pair := strings.Split(entry, "=")
+			if len(pair) < 2 {
+				return nil, fmt.Errorf("error parsing map default value %q into pairs", entry)
+			}
+			v := pair[1]
+			key := &Value{Str: &pair[0]}
+			valueType := f.t.Type.Elem()
+			valueKind := valueType.Kind()
+			if valueKind == reflect.Map || valueKind == reflect.Slice {
+				return nil, fmt.Errorf("default value doesnot support nested map or slice inside a map")
+			}
+			valueField := field{
+				t: reflect.StructField{},
+				v: reflect.New(valueType),
+			}
+			val, err := defaultValueFromTag(valueField, v)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing map default value %q into value, %v", v, err)
+			}
+			// so that we deduplicate the keys, last one up
+			mEntries[pair[0]] = &MapEntry{
+				Pos:   lexer.Position{},
+				Key:   key,
+				Value: val,
+			}
+		}
+
+		for k := range mEntries {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			mapEntries = append(mapEntries, mEntries[k])
+		}
+
+		return &Value{
+			HaveMap: true,
+			Map:     mapEntries,
+		}, nil
+	case reflect.Slice:
+		slice := []*Value{}
+		list := strings.Split(defaultValue, ",")
+		valueType := f.t.Type.Elem()
+		valueKind := valueType.Kind()
+		if valueKind == reflect.Map || valueKind == reflect.Slice {
+			return nil, fmt.Errorf("default value doesnot support nested map or slice inside a map")
+		}
+		valueField := field{
+			t: reflect.StructField{},
+			v: reflect.New(valueType),
+		}
+		for _, item := range list {
+			value, err := defaultValueFromTag(valueField, item)
+			if err != nil {
+				return nil, fmt.Errorf("error applying default value %q to list: %v", item, err)
+			}
+			slice = append(slice, value)
+		}
+
+		return &Value{
+			HaveList: true,
+			List:     slice,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("default value can only apply to primitive types(excluding bool), map & slices, not %q", f.v.Kind())
 }
 
 func valueToValue(v reflect.Value) (*Value, error) {

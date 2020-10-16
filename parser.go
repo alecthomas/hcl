@@ -95,6 +95,9 @@ type Attribute struct {
 	Key   string `parser:"@Ident '='" json:"key"`
 	Value *Value `parser:"@@" json:"value"`
 
+	// This will be populated during unmarshalling.
+	DefaultValue *Value `parser:"" json:"default_value,omitempty"`
+
 	// Set for schemas when the attribute is optional.
 	Optional bool `parser:"" json:"optional,omitempty"`
 }
