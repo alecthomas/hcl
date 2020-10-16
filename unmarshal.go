@@ -116,6 +116,18 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalOptions) er
 			if !tag.optional && haventSeen {
 				return fmt.Errorf("missing required attribute %q", tag.name)
 			}
+			// apply defaults here as there's no value for this field
+			v, err := defaultValueFromTag(field, tag.defaultValue)
+			if err != nil {
+				return err
+			}
+			if v != nil {
+				err = unmarshalValue(field.v, v)
+				if err != nil {
+					return fmt.Errorf("error applying default value to field %q, %v", field.t.Name, err)
+				}
+			}
+
 			continue
 		}
 		delete(seen, tag.name)
@@ -398,12 +410,13 @@ func fieldID(parent reflect.Type, t reflect.StructField) string {
 }
 
 type tag struct {
-	name     string
-	optional bool
-	label    bool
-	block    bool
-	remain   bool
-	help     string
+	name         string
+	optional     bool
+	label        bool
+	block        bool
+	remain       bool
+	help         string
+	defaultValue string
 }
 
 func (t tag) comments() []string {
@@ -416,6 +429,7 @@ func (t tag) comments() []string {
 func parseTag(parent reflect.Type, f field, opt *marshalOptions) tag {
 	t := f.t
 	help := t.Tag.Get("help")
+	defaultValue := t.Tag.Get("default")
 	s, ok := t.Tag.Lookup("hcl")
 
 	isBlock := false
@@ -431,7 +445,7 @@ func parseTag(parent reflect.Type, f field, opt *marshalOptions) tag {
 	if !ok {
 		s, ok = t.Tag.Lookup("json")
 		if !ok {
-			return tag{name: t.Name, block: isBlock, optional: true, help: help}
+			return tag{name: t.Name, block: isBlock, optional: true, help: help, defaultValue: defaultValue}
 		}
 	}
 	parts := strings.Split(s, ",")
@@ -444,12 +458,12 @@ func parseTag(parent reflect.Type, f field, opt *marshalOptions) tag {
 		name = t.Name
 	}
 	if len(parts) == 1 {
-		return tag{name: name, block: isBlock, help: help}
+		return tag{name: name, block: isBlock, help: help, defaultValue: defaultValue, optional: defaultValue != ""}
 	}
 	option := parts[1]
 	switch option {
 	case "optional", "omitempty":
-		return tag{name: name, block: isBlock, optional: true, help: help}
+		return tag{name: name, block: isBlock, optional: true, help: help, defaultValue: defaultValue}
 	case "label":
 		return tag{name: name, label: true, help: help}
 	case "block":

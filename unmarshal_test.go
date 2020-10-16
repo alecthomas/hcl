@@ -27,6 +27,36 @@ func (n *Number) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+type test struct {
+	name    string
+	hcl     string
+	dest    interface{}
+	fail    string
+	fixup   func(interface{}) // fixup unmarshalled structs
+	options []MarshalOption
+}
+
+func runTests(t *testing.T, tests []test) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rv := reflect.New(reflect.TypeOf(test.dest))
+			actual := rv.Interface()
+			err := Unmarshal([]byte(test.hcl), actual, test.options...)
+			if test.fail != "" {
+				require.EqualError(t, err, test.fail)
+			} else {
+				require.NoError(t, err)
+				if test.fixup != nil {
+					test.fixup(actual)
+				}
+				require.Equal(t,
+					repr.String(test.dest, repr.Indent("  ")),
+					repr.String(rv.Elem().Interface(), repr.Indent("  ")))
+			}
+		})
+	}
+}
+
 func TestUnmarshal(t *testing.T) {
 	type strBlock struct {
 		Str string `hcl:"str"`
@@ -40,14 +70,7 @@ func TestUnmarshal(t *testing.T) {
 	}
 	timestamp, err := time.Parse(time.RFC3339, "2020-01-02T15:04:05Z")
 	require.NoError(t, err)
-	tests := []struct {
-		name    string
-		hcl     string
-		dest    interface{}
-		fail    string
-		fixup   func(interface{}) // fixup unmarshalled structs
-		options []MarshalOption
-	}{
+	tests := []test{
 		{name: "Embed",
 			hcl: `
 				str = "foo"
@@ -328,24 +351,7 @@ are = true
 			options: []MarshalOption{InferHCLTags(true)},
 		},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			rv := reflect.New(reflect.TypeOf(test.dest))
-			actual := rv.Interface()
-			err := Unmarshal([]byte(test.hcl), actual, test.options...)
-			if test.fail != "" {
-				require.EqualError(t, err, test.fail)
-			} else {
-				require.NoError(t, err)
-				if test.fixup != nil {
-					test.fixup(actual)
-				}
-				require.Equal(t,
-					repr.String(test.dest, repr.Indent("  ")),
-					repr.String(rv.Elem().Interface(), repr.Indent("  ")))
-			}
-		})
-	}
+	runTests(t, tests)
 }
 
 type remainStruct struct {
@@ -522,4 +528,142 @@ f {
 	data, err := Marshal(&b)
 	require.NoError(t, err)
 	require.Equal(t, "f {\n  g = \"str\"\n}\n", string(data))
+}
+
+type defaultStruct struct {
+	Name           string                      `hcl:"name"`
+	DefaultString  string                      `hcl:"" default:"not empty"`
+	DefaultInt     int                         `hcl:"" default:"3"`
+	DefaultFloat   float32                     `hcl:"" default:"3.00"`
+	DefaultBoolean bool                        `hcl:"" default:"true"`
+	DefaultMap     map[string]int              `hcl:"" default:"a=2;b=4;c=6"`
+	DefaultSlice   []int32                     `hcl:"" default:"4,5,6,7,8,9,10"`
+	NestedStruct   nestedStructureWithDefaults `hcl:"nested,block"`
+	// This field is here to provide test case where if you don't have the block. the block won't be created
+	NestedStruct2 nestedStructureWithDefaults `hcl:"nested2,block"`
+}
+
+type nestedStructureWithDefaults struct {
+	RequiredField string `hcl:"requiredField"`
+	DefaultString string `hcl:"" default:"nested"`
+}
+
+func TestDefaultValueValidCases(t *testing.T) {
+	hcl := `
+name = "name"
+nested {
+  requiredField = "required"
+}
+`
+	expected := defaultStruct{
+		Name:           "name",
+		DefaultString:  "not empty",
+		DefaultInt:     3,
+		DefaultFloat:   3.00,
+		DefaultBoolean: true,
+		DefaultMap: map[string]int{
+			"a": 2,
+			"b": 4,
+			"c": 6,
+		},
+		DefaultSlice: []int32{4, 5, 6, 7, 8, 9, 10},
+		NestedStruct: nestedStructureWithDefaults{
+			RequiredField: "required",
+			DefaultString: "nested",
+		},
+	}
+
+	actual := defaultStruct{}
+
+	err := Unmarshal([]byte(hcl), &actual)
+	require.NoError(t, err)
+	require.Equal(t, actual, expected)
+
+}
+
+func TestDefaultValueInvalidCases(t *testing.T) {
+	hcl := `
+name = "a"
+`
+	tests := []test{
+		{
+			name: "wrong int",
+			hcl:  hcl,
+			dest: struct {
+				Name string `hcl:"name"`
+				Int  int32  `hcl:"integer" default:"abc"`
+			}{
+				Name: "a",
+			},
+			fail: `error converting default value "abc" to int`,
+		},
+		{
+			name: "wrong float",
+			hcl:  hcl,
+			dest: struct {
+				Name  string  `hcl:"name"`
+				FLoat float32 `hcl:"integer" default:"abc"`
+			}{
+				Name: "a",
+			},
+			fail: `error converting default value "abc" to float`,
+		},
+		{
+			name: "wrong bool",
+			hcl:  hcl,
+			dest: struct {
+				Name string `hcl:"name"`
+				Bool bool   `hcl:"integer" default:"abc"`
+			}{
+				Name: "a",
+			},
+			fail: `error converting default value "abc" to bool`,
+		},
+		{
+			name: "wrong map",
+			hcl:  hcl,
+			dest: struct {
+				Name string           `hcl:"name"`
+				Map  map[string]int32 `hcl:"integer" default:"abc"`
+			}{
+				Name: "a",
+			},
+			fail: `error parsing map default value "abc" into pairs`,
+		},
+		{
+			name: "wrong map value",
+			hcl:  hcl,
+			dest: struct {
+				Name string           `hcl:"name"`
+				Map  map[string]int32 `hcl:"integer" default:"key1=2;key2=test"`
+			}{
+				Name: "a",
+			},
+			fail: `error parsing map default value "test" into value, error converting default value "test" to int`,
+		},
+		{
+			name: "wrong map separator",
+			hcl:  hcl,
+			dest: struct {
+				Name string           `hcl:"name"`
+				Map  map[string]int32 `hcl:"integer" default:"key1=2,key2=test"`
+			}{
+				Name: "a",
+			},
+			fail: `error parsing map default value "2,key2" into value, error converting default value "2,key2" to int`,
+		},
+		{
+			name: "wrong slice",
+			hcl:  hcl,
+			dest: struct {
+				Name string  `hcl:"name"`
+				Map  []int32 `hcl:"integer" default:"a,b"`
+			}{
+				Name: "a",
+			},
+			fail: `error applying default value "a" to list: error converting default value "a" to int`,
+		}}
+
+	runTests(t, tests)
+
 }

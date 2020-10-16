@@ -163,6 +163,63 @@ block {
 `,
 			options: []MarshalOption{InferHCLTags(true)},
 		},
+		{
+			name: "default values",
+			src: &struct {
+				Str string `hcl:"strVal" default:"str"`
+				// where default is not empty value anymore
+				StrSameDefault   string           `hcl:"strSameDefault" default:"str"`
+				StrDiffDefault   string           `hcl:"strDiffDefault" default:"str"`
+				Int              int64            `hcl:"intVal" default:"1"`
+				IntSameDefault   int64            `hcl:"intSameDefault" default:"1"`
+				IntDiffDefault   int64            `hcl:"intDiffDefault" default:"1"`
+				Float            float64          `hcl:"floatVal" default:"2.33"`
+				FloatSameDefault float64          `hcl:"floatSameDefault" default:"2.33"`
+				FloatDiffDefault float64          `hcl:"floatDiffDefault" default:"2.33"`
+				Slice            []string         `hcl:"sliceVal" default:"a,b,c"`
+				SliceSameDefault []string         `hcl:"sliceSameDefault" default:"a,b,c"`
+				SliceDiffDefault []string         `hcl:"sliceDiffDefault" default:"a,b,c"`
+				Map              map[string]int32 `hcl:"mapVal" default:"a=4;b=5;c=6"`
+				MapSameDefault   map[string]int32 `hcl:"mapSameDefault" default:"a=4;b=5;c=6"`
+				MapDiffDefault   map[string]int32 `hcl:"mapDiffDefault" default:"a=4;b=5;c=6"`
+			}{
+				StrSameDefault:   "str",
+				StrDiffDefault:   "diff",
+				IntSameDefault:   1,
+				IntDiffDefault:   2,
+				FloatSameDefault: 2.33,
+				FloatDiffDefault: 3.44,
+				SliceSameDefault: []string{"a", "b", "c"},
+				SliceDiffDefault: []string{"c", "d", "e"},
+				MapSameDefault: map[string]int32{
+					"a": 4,
+					"c": 6,
+					"b": 5,
+				},
+				MapDiffDefault: map[string]int32{
+					"e": 7,
+					"f": 8,
+					"g": 9,
+				},
+			},
+			expected: `
+strVal = ""
+strDiffDefault = "diff"
+intVal = 0
+intDiffDefault = 2
+floatVal = 0
+floatDiffDefault = 3.44
+sliceVal = []
+sliceDiffDefault = ["c", "d", "e"]
+mapVal = {
+}
+mapDiffDefault = {
+  "e": 7,
+  "f": 8,
+  "g": 9,
+}
+`,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -171,4 +228,30 @@ block {
 			require.Equal(t, strings.TrimSpace(test.expected), strings.TrimSpace(string(data)))
 		})
 	}
+}
+
+type TestStruct struct {
+	Val         string `hcl:"val"`
+	DefaultVal  string `hcl:"default_val" default:"test"`
+	DefaultVal2 int64  `hcl:"default_val_2" default:"60"`
+}
+
+func TestUnmarshalThenMarshal(t *testing.T) {
+	hcl := `
+val = "val"
+default_val = "2"
+`
+	v := &TestStruct{}
+
+	err := Unmarshal([]byte(hcl), v)
+	require.NoError(t, err)
+
+	require.Equal(t, v.Val, "val")
+	require.Equal(t, v.DefaultVal, "2")
+	require.Equal(t, v.DefaultVal2, int64(60))
+
+	marshalled, err := Marshal(v)
+	require.NoError(t, err)
+	require.Equal(t, strings.TrimSpace(hcl), strings.TrimSpace(string(marshalled)))
+
 }
