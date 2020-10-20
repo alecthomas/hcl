@@ -122,6 +122,11 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalOptions) er
 				return err
 			}
 			if v != nil {
+				// check enum before assigning default value
+				err := checkEnum(v, field, tag.enum)
+				if err != nil {
+					return fmt.Errorf("default value conflicts with enum: %v", err)
+				}
 				err = unmarshalValue(field.v, v)
 				if err != nil {
 					return fmt.Errorf("error applying default value to field %q, %v", field.t.Name, err)
@@ -233,6 +238,11 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalOptions) er
 				return participle.Errorf(entry.Pos, "expected an attribute for %q but got a block", tag.name)
 			}
 			value := entry.Attribute.Value
+			// check enum before unmarshalling actual value
+			err := checkEnum(value, field, tag.enum)
+			if err != nil {
+				return err
+			}
 			err = unmarshalValue(field.v, value)
 			if err != nil {
 				return participle.AnnotateError(value.Pos, err)
@@ -252,6 +262,36 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalOptions) er
 		return participle.Errorf(*pos, "found extra fields %s", strings.Join(need, ", "))
 	}
 	return nil
+}
+
+func checkEnum(v *Value, f field, enum string) error { // nolint: interfacer
+	if enum == "" {
+		return nil
+	}
+
+	k := f.v.Kind()
+	if k == reflect.Ptr {
+		k = f.v.Elem().Kind()
+	}
+
+	switch k {
+	case reflect.Map, reflect.Struct, reflect.Array, reflect.Slice:
+		return fmt.Errorf("enum on map, struct, array and slice are not supported on field %q", f.t.Name)
+	default:
+		enums, err := enumValuesFromTag(f, enum)
+		if err != nil {
+			return err
+		}
+		enumStr := []string{}
+		for _, e := range enums {
+			if e.String() == v.String() {
+				return nil
+			}
+			enumStr = append(enumStr, e.String())
+		}
+
+		return fmt.Errorf("value %s does not match anything within enum %s", v.String(), strings.Join(enumStr, ", "))
+	}
 }
 
 func unmarshalBlock(v reflect.Value, block *Block, opt *marshalOptions) error {
@@ -417,6 +457,7 @@ type tag struct {
 	remain       bool
 	help         string
 	defaultValue string
+	enum         string
 }
 
 func (t tag) comments() []string {
@@ -430,6 +471,7 @@ func parseTag(parent reflect.Type, f field, opt *marshalOptions) tag {
 	t := f.t
 	help := t.Tag.Get("help")
 	defaultValue := t.Tag.Get("default")
+	enum := t.Tag.Get("enum")
 	s, ok := t.Tag.Lookup("hcl")
 
 	isBlock := false
@@ -445,7 +487,7 @@ func parseTag(parent reflect.Type, f field, opt *marshalOptions) tag {
 	if !ok {
 		s, ok = t.Tag.Lookup("json")
 		if !ok {
-			return tag{name: t.Name, block: isBlock, optional: true, help: help, defaultValue: defaultValue}
+			return tag{name: t.Name, block: isBlock, optional: true, help: help, defaultValue: defaultValue, enum: enum}
 		}
 	}
 	parts := strings.Split(s, ",")
@@ -458,12 +500,12 @@ func parseTag(parent reflect.Type, f field, opt *marshalOptions) tag {
 		name = t.Name
 	}
 	if len(parts) == 1 {
-		return tag{name: name, block: isBlock, help: help, defaultValue: defaultValue, optional: defaultValue != ""}
+		return tag{name: name, block: isBlock, help: help, defaultValue: defaultValue, optional: defaultValue != "", enum: enum}
 	}
 	option := parts[1]
 	switch option {
 	case "optional", "omitempty":
-		return tag{name: name, block: isBlock, optional: true, help: help, defaultValue: defaultValue}
+		return tag{name: name, block: isBlock, optional: true, help: help, defaultValue: defaultValue, enum: enum}
 	case "label":
 		return tag{name: name, label: true, help: help}
 	case "block":
