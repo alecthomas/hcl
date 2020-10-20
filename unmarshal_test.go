@@ -587,7 +587,7 @@ name = "a"
 `
 	tests := []test{
 		{
-			name: "wrong int",
+			name: "Wrong Int",
 			hcl:  hcl,
 			dest: struct {
 				Name string `hcl:"name"`
@@ -595,10 +595,10 @@ name = "a"
 			}{
 				Name: "a",
 			},
-			fail: `error converting default value "abc" to int`,
+			fail: `error parsing default value: error converting "abc" to int`,
 		},
 		{
-			name: "wrong float",
+			name: "Wrong Float",
 			hcl:  hcl,
 			dest: struct {
 				Name  string  `hcl:"name"`
@@ -606,10 +606,10 @@ name = "a"
 			}{
 				Name: "a",
 			},
-			fail: `error converting default value "abc" to float`,
+			fail: `error parsing default value: error converting "abc" to float`,
 		},
 		{
-			name: "wrong bool",
+			name: "Wrong Bool",
 			hcl:  hcl,
 			dest: struct {
 				Name string `hcl:"name"`
@@ -617,10 +617,10 @@ name = "a"
 			}{
 				Name: "a",
 			},
-			fail: `error converting default value "abc" to bool`,
+			fail: `error parsing default value: error converting "abc" to bool`,
 		},
 		{
-			name: "wrong map",
+			name: "Wrong Map",
 			hcl:  hcl,
 			dest: struct {
 				Name string           `hcl:"name"`
@@ -628,10 +628,10 @@ name = "a"
 			}{
 				Name: "a",
 			},
-			fail: `error parsing map default value "abc" into pairs`,
+			fail: `error parsing default value: error parsing map "abc" into pairs`,
 		},
 		{
-			name: "wrong map value",
+			name: "Wrong Map Value",
 			hcl:  hcl,
 			dest: struct {
 				Name string           `hcl:"name"`
@@ -639,10 +639,10 @@ name = "a"
 			}{
 				Name: "a",
 			},
-			fail: `error parsing map default value "test" into value, error converting default value "test" to int`,
+			fail: `error parsing default value: error parsing map "test" into value, error parsing default value: error converting "test" to int`,
 		},
 		{
-			name: "wrong map separator",
+			name: "Wrong Map Separator",
 			hcl:  hcl,
 			dest: struct {
 				Name string           `hcl:"name"`
@@ -650,10 +650,10 @@ name = "a"
 			}{
 				Name: "a",
 			},
-			fail: `error parsing map default value "2,key2" into value, error converting default value "2,key2" to int`,
+			fail: `error parsing default value: error parsing map "2,key2" into value, error parsing default value: error converting "2,key2" to int`,
 		},
 		{
-			name: "wrong slice",
+			name: "Wrong Slice",
 			hcl:  hcl,
 			dest: struct {
 				Name string  `hcl:"name"`
@@ -661,9 +661,129 @@ name = "a"
 			}{
 				Name: "a",
 			},
-			fail: `error applying default value "a" to list: error converting default value "a" to int`,
+			fail: `error parsing default value: error applying "a" to list: error parsing default value: error converting "a" to int`,
 		}}
 
 	runTests(t, tests)
+}
 
+func TestEnumValidCases(t *testing.T) {
+	tests := []test{
+		{
+			name: "Enum Valid Cases",
+			hcl: `
+name = "test"
+str_val = "a"
+int_val = 5
+float_val = 2.11
+`,
+			dest: struct {
+				Name     string  `hcl:"name"`
+				StrVal   string  `hcl:"str_val" enum:"a,b,c"`
+				IntVal   int64   `hcl:"int_val" enum:"2,5,8"`
+				FloatVal float64 `hcl:"float_val" enum:"2.11,5.32,8.91"`
+			}{
+				Name:     "test",
+				StrVal:   "a",
+				IntVal:   5,
+				FloatVal: 2.11,
+			},
+		},
+	}
+
+	runTests(t, tests)
+}
+
+func TestEnumInvalidCases(t *testing.T) {
+	tests := []test{
+		{
+			name: "String Mismatch",
+			hcl: `
+name = "test"
+`,
+			dest: struct {
+				Name string `hcl:"name" enum:"a,b,c"`
+			}{
+				Name: "test",
+			},
+			fail: `value "test" does not match anything within enum "a", "b", "c"`,
+		},
+		{
+			name: "Float Mismatch",
+			hcl: `
+val = 2.33
+`,
+			dest: struct {
+				Val float64 `hcl:"val" enum:"2.11,2.21,5.22"`
+			}{
+				Val: 2.33,
+			},
+			fail: `value 2.33 does not match anything within enum 2.11, 2.21, 5.22`,
+		},
+		{
+			name: "Int Mismatch",
+			hcl: `
+val = 17
+`,
+			dest: struct {
+				Val int32 `hcl:"val" enum:"10,25,100"`
+			}{
+				Val: 17,
+			},
+			fail: `value 17 does not match anything within enum 10, 25, 100`,
+		},
+		{
+			name: "String Default Value Conflicts",
+			hcl: `
+`,
+			dest: struct {
+				Str string `hcl:"str" enum:"a,b,c" default:"d"`
+			}{
+				Str: "d",
+			},
+			fail: `default value conflicts with enum: value "d" does not match anything within enum "a", "b", "c"`,
+		},
+		{
+			name: "Int Default Value Conflicts",
+			hcl:  ``,
+			dest: struct {
+				Val int `hcl:"val" enum:"5,8,10" default:"9"`
+			}{
+				Val: 9,
+			},
+			fail: `default value conflicts with enum: value 9 does not match anything within enum 5, 8, 10`,
+		},
+		{
+			name: "Float Default Value Conflicts",
+			hcl:  ``,
+			dest: struct {
+				Val float64 `hcl:"val" enum:"5.2,8,10.9" default:"9.01"`
+			}{
+				Val: 9.01,
+			},
+			fail: `default value conflicts with enum: value 9.01 does not match anything within enum 5.2, 8, 10.9`,
+		},
+		{
+			name: "Int Enum Parse Error",
+			hcl:  ``,
+			dest: struct {
+				Val int32 `hcl:"val" enum:"5.2,8,10.9" default:"9"`
+			}{
+				Val: 9,
+			},
+			fail: `default value conflicts with enum: error parsing enum: error converting "5.2" to int`,
+		},
+		{
+			name: "Float Enum Parse Error",
+			hcl:  ``,
+			dest: struct {
+				Val float64 `hcl:"val" enum:"5.2,8,a" default:"9.2"`
+			}{
+				Val: 9.2,
+			},
+			fail: `default value conflicts with enum: error parsing enum: error converting "a" to float`,
+		},
+	}
+
+	runTests(t, tests)
 }

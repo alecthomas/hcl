@@ -98,6 +98,9 @@ type Attribute struct {
 	// This will be populated during unmarshalling.
 	DefaultValue *Value `parser:"" json:"default_value,omitempty"`
 
+	// This will be parsed from the enum tag and will be helping the validation during unmarshalling
+	Enum []*Value `parser:"" json:"enum,omitempty"`
+
 	// Set for schemas when the attribute is optional.
 	Optional bool `parser:"" json:"optional,omitempty"`
 }

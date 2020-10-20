@@ -23,6 +23,8 @@ type testSchema struct {
 		Label1 string `hcl:"label1,label"`
 		Attr   string `hcl:"attr"`
 	} `hcl:"block_slice,block" help:"Repeated blocks."`
+	DefaultStr string `hcl:"default_str" default:"def"`
+	EnumStr    string `hcl:"enum_str" enum:"a,b,c"`
 }
 
 const expectedSchema = `
@@ -45,6 +47,9 @@ block "name" {
 block_slice "label0" "label1" { // (repeated)
   attr = string
 }
+
+default_str = string // (optional)
+enum_str = string
 `
 const expectedJSONSchema = `
 {
@@ -153,6 +158,37 @@ const expectedJSONSchema = `
           }
         ],
         "repeated": true
+      }
+    },
+    {
+      "attribute": {
+        "key": "default_str",
+        "value": {
+          "type": "string"
+        },
+        "default_value": {
+          "str": "def"
+        },
+        "optional": true
+      }
+    },
+    {
+      "attribute": {
+        "key": "enum_str",
+        "value": {
+          "type": "string"
+        },
+        "enum": [
+          {
+            "str": "a"
+          },
+          {
+            "str": "b"
+          },
+          {
+            "str": "c"
+          }
+        ]
       }
     }
   ],
