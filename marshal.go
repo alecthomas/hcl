@@ -230,7 +230,7 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 
 	switch k {
 	case reflect.String:
-		return &Value{Str: &defaultValue}, nil
+		return &Value{Str: &defaultValue, Type: &strType}, nil
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		n, err := strconv.ParseInt(defaultValue, 10, 64)
 		if err != nil {
@@ -238,6 +238,7 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 		}
 		return &Value{
 			Number: big.NewFloat(0).SetInt64(n),
+			Type:   &numType,
 		}, nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		n, err := strconv.ParseUint(defaultValue, 10, 64)
@@ -246,6 +247,7 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 		}
 		return &Value{
 			Number: big.NewFloat(0).SetUint64(n),
+			Type:   &numType,
 		}, nil
 	case reflect.Float32, reflect.Float64:
 		n, err := strconv.ParseFloat(defaultValue, 10)
@@ -254,6 +256,7 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 		}
 		return &Value{
 			Number: big.NewFloat(n),
+			Type:   &numType,
 		}, nil
 	case reflect.Bool:
 		b, err := strconv.ParseBool(defaultValue)
@@ -263,6 +266,7 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 		v := Bool(b)
 		return &Value{
 			Bool: &v,
+			Type: &boolType,
 		}, nil
 	case reflect.Map:
 		mapEntries := []*MapEntry{}

@@ -167,6 +167,7 @@ const expectedJSONSchema = `
           "type": "string"
         },
         "default_value": {
+          "type": "string",
           "str": "def"
         },
         "optional": true
@@ -180,12 +181,15 @@ const expectedJSONSchema = `
         },
         "enum": [
           {
+            "type": "string",
             "str": "a"
           },
           {
+            "type": "string",
             "str": "b"
           },
           {
+            "type": "string",
             "str": "c"
           }
         ]
