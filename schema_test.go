@@ -166,7 +166,7 @@ const expectedJSONSchema = `
         "value": {
           "type": "string"
         },
-        "default_value": {
+        "default": {
           "str": "def"
         },
         "optional": true
