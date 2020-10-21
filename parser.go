@@ -96,7 +96,7 @@ type Attribute struct {
 	Value *Value `parser:"@@" json:"value"`
 
 	// This will be populated during unmarshalling.
-	DefaultValue *Value `parser:"" json:"default_value,omitempty"`
+	Default *Value `parser:"" json:"default,omitempty"`
 
 	// This will be parsed from the enum tag and will be helping the validation during unmarshalling
 	Enum []*Value `parser:"" json:"enum,omitempty"`

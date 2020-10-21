@@ -153,8 +153,8 @@ func structToEntries(v reflect.Value, schema bool, opt *marshalOptions) (entries
 			if err != nil {
 				return nil, nil, err
 			}
-			hasDefaultAndEqualsValue := attr.DefaultValue != nil && attr.Value.String() == attr.DefaultValue.String()
-			noDefaultButIsZero := attr.DefaultValue == nil && field.v.IsZero()
+			hasDefaultAndEqualsValue := attr.Default != nil && attr.Value.String() == attr.Default.String()
+			noDefaultButIsZero := attr.Default == nil && field.v.IsZero()
 			valueEqualsDefault := noDefaultButIsZero || hasDefaultAndEqualsValue
 			if tag.optional && !schema && valueEqualsDefault {
 				continue
@@ -179,11 +179,11 @@ func fieldToAttr(field field, tag tag, schema bool) (*Attribute, error) {
 	if err != nil {
 		return nil, err
 	}
-	attr.DefaultValue, err = defaultValueFromTag(field, tag.defaultValue)
+	attr.Default, err = defaultValueFromTag(field, tag.defaultValue)
 	if err != nil {
 		return nil, err
 	}
-	attr.Optional = (tag.optional || attr.DefaultValue != nil) && schema
+	attr.Optional = (tag.optional || attr.Default != nil) && schema
 	attr.Enum, err = enumValuesFromTag(field, tag.enum)
 	return attr, err
 }
