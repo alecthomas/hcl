@@ -787,3 +787,39 @@ val = 17
 
 	runTests(t, tests)
 }
+
+func TestUnmarshalJsonTaggedBlock(t *testing.T) {
+	hcl := `
+str = "test"
+
+config {
+  key = "inferHCLTags"
+  value = "yes"
+}
+
+refs {
+  name = "ref1"
+}
+
+refs {
+  name = "ref2"
+}
+
+refs {
+  name = "ref3"
+}
+`
+	expected := jsonTaggedSchema{
+		Str: "test",
+		Config: keyValue{
+			Key:   "inferHCLTags",
+			Value: "yes",
+		},
+		Options: nil,
+		Refs:    []objectRef{{"ref1"}, {"ref2"}, {"ref3"}},
+	}
+	var actual jsonTaggedSchema
+	err := Unmarshal([]byte(hcl), &actual)
+	require.NoError(t, err)
+	require.Equal(t, actual, expected)
+}

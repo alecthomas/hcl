@@ -220,6 +220,23 @@ mapDiffDefault = {
 }
 `,
 		},
+		{name: "JsonBlockSlice",
+			src: &struct {
+				Block struct {
+					Str string `json:"str"`
+				} `json:"block"`
+			}{
+				Block: struct {
+					Str string `json:"str"`
+				}{Str: "val"},
+			},
+			expected: `
+block {
+  str = "val"
+}
+`,
+			options: []MarshalOption{InferHCLTags(true)},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

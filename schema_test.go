@@ -27,6 +27,22 @@ type testSchema struct {
 	EnumStr    string `hcl:"enum_str" enum:"a,b,c"`
 }
 
+type keyValue struct {
+	Key   string `json:"key"`
+	Value string `json:"value,omitempty"`
+}
+
+type objectRef struct {
+	Name string `json:"name"`
+}
+
+type jsonTaggedSchema struct {
+	Str     string      `json:"str"`
+	Config  keyValue    `json:"config"`
+	Options *keyValue   `json:"options,omitempty"`
+	Refs    []objectRef `json:"refs,omitempty"`
+}
+
 const expectedSchema = `
 // A string field.
 str = string
@@ -226,22 +242,12 @@ block "label" {
 }
 
 func TestJsonTaggedSchema(t *testing.T) {
-	type KeyValue struct {
-		Key   string `json:"key"`
-		Value string `json:"value,omitempty"`
-	}
-
-	type jsonTaggedSchema struct {
-		Str     string    `json:"str"`
-		Config  KeyValue  `json:"config"`
-		Options *KeyValue `json:"options,omitempty"`
-	}
-
 	var val interface{}
 	val = &jsonTaggedSchema{
 		Str:     "testSchema",
-		Config:  KeyValue{"key1", "val1"},
-		Options: &KeyValue{},
+		Config:  keyValue{"key1", "val1"},
+		Options: &keyValue{},
+		Refs:    []objectRef{{"ref11"}, {"ref12"}, {"ref13"}},
 	}
 	schema, err := Schema(val, InferHCLTags(true))
 	require.NoError(t, err)
@@ -258,6 +264,10 @@ config {
 options {
   key = string
   value = string // (optional)
+}
+
+refs { // (repeated)
+  name = string
 }
     `
 	require.Equal(t, strings.TrimSpace(expectedSchema), strings.TrimSpace(string(data)))

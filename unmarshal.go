@@ -478,7 +478,7 @@ func parseTag(parent reflect.Type, f field, opt *marshalOptions) tag {
 	if !ok && opt.inferHCLTags {
 		// if the struct field is a struct or pointer to struct set the tag as block
 		tt := t.Type
-		for tt.Kind() == reflect.Ptr {
+		for tt.Kind() == reflect.Ptr || tt.Kind() == reflect.Slice {
 			tt = tt.Elem()
 		}
 		isBlock = tt.Kind() == reflect.Struct
