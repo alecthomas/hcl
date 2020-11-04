@@ -305,7 +305,7 @@ var (
 			{"Ident", `\b[[:alpha:]]\w*(-\w+)*\b`, nil},
 			{"Number", `\b^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?\b`, nil},
 			{"Heredoc", `<<[-]?(\w+\b)`, stateful.Push("Heredoc")},
-			{"String", `"(\\\d\d\d|\\.|[^"])*"`, nil},
+			{"String", `"(\\\d\d\d|\\.|[^"])*"|'(\\\d\d\d|\\.|[^'])*'`, nil},
 			{"Punct", `[][{}=:,]`, nil},
 			{"Comment", `(?:(?://|#)[^\n]*)|/\*.*?\*/`, nil},
 			{"whitespace", `\s+`, nil},

@@ -147,6 +147,12 @@ EOF
 					// trailing comment
 				`,
 			expected: trailingComments(hcl(attr("a", hbool(true))), "trailing comment")},
+		{name: "SingleQuotedString",
+			hcl: `
+				a = 'hello\nworld'
+				`,
+			expected: hcl(attr("a", str("hello\nworld"))),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
