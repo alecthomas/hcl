@@ -311,7 +311,7 @@ var (
 			{"whitespace", `\s+`, nil},
 		},
 		"Heredoc": {
-			{"End", `\n\b\1\b`, stateful.Pop()},
+			{"End", `\n\s*\b\1\b`, stateful.Pop()},
 			{"EOL", `\n`, nil},
 			{"Body", `[^\n]+`, nil},
 		},
