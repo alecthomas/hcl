@@ -54,13 +54,13 @@ EOF
 		{name: "IndentedHeredoc",
 			hcl: `
 				doc = <<-EOF
-some thing
-or another
+	some thing
+	or another
 EOF
 			`,
 			expected: &AST{
 				Entries: []*Entry{
-					attr("doc", heredoc("-EOF", "\nsome thing\nor another")),
+					attr("doc", heredoc("-EOF", "\n\tsome thing\n\tor another")),
 				},
 			},
 		},
@@ -167,6 +167,18 @@ EOF
 			}
 		})
 	}
+}
+
+func TestHeredocIndented(t *testing.T) {
+	hcl, err := ParseString(`
+	doc = <<-EOF
+	some thing
+	or another
+EOF
+`)
+	require.NoError(t, err)
+	expected := "some thing\nor another"
+	require.Equal(t, expected, hcl.Entries[0].Attribute.Value.GetHeredoc())
 }
 
 func heredoc(delim, s string) *Value {

@@ -80,7 +80,7 @@ func addParentRefs(parent, node Node) {
 func dedent(s string) string {
 	lines := strings.Split(s, "\n")
 	indent := whitespacePrefix(lines[0])
-	for _, line := range lines {
+	for _, line := range lines[1:] {
 		candidate := whitespacePrefix(line)
 		if len(candidate) < len(indent) {
 			indent = candidate
@@ -97,6 +97,8 @@ func whitespacePrefix(s string) string {
 	for _, rn := range s {
 		if unicode.IsSpace(rn) {
 			indent += string(rn)
+		} else {
+			break
 		}
 	}
 	return indent
