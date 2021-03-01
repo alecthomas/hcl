@@ -100,7 +100,7 @@ func TestMarshalJSON(t *testing.T) {
 			}
 		`)
 	require.NoError(t, err)
-	actual, err := MarshalJSON(ast, MarshalJSONOptions{Comments: true})
+	actual, err := MarshalJSON(ast, IncludeComments(true))
 	require.NoError(t, err)
 	buf := &bytes.Buffer{}
 	err = json.Indent(buf, actual, "", "  ")

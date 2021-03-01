@@ -9,19 +9,29 @@ import (
 	"github.com/alecthomas/repr"
 )
 
-// MarshalJSONOptions controls how custom JSON marshaling is applied.
-type MarshalJSONOptions struct {
+// MarshalJSONOption implementations control how JSON is marshalled.
+type MarshalJSONOption func(o *marshalJSONOptions)
+
+// IncludeComments includes comments as __comments__ attributes in the generated JSON.
+func IncludeComments(ok bool) MarshalJSONOption {
+	return func(o *marshalJSONOptions) { o.comments = ok }
+}
+
+// marshalJSONOptions controls how custom JSON marshaling is applied.
+type marshalJSONOptions struct {
 	// Include comments as JSON attributes.
-	Comments bool
+	comments bool
 }
 
 // MarshalJSON gives fine-grained control over JSON marshaling of an AST.
 //
 // Currently this just means that emission of comments can be controlled.
-func MarshalJSON(ast *AST, options MarshalJSONOptions) ([]byte, error) {
+func MarshalJSON(ast *AST, options ...MarshalJSONOption) ([]byte, error) {
 	m := &jsonVisitor{
-		Buffer:             &bytes.Buffer{},
-		MarshalJSONOptions: options,
+		Buffer: &bytes.Buffer{},
+	}
+	for _, option := range options {
+		option(&m.marshalJSONOptions)
 	}
 	err := Visit(ast, m.Visit)
 	return m.Bytes(), err
@@ -31,14 +41,14 @@ func (a *AST) MarshalJSON() ([]byte, error) {
 	if a.Schema {
 		return json.Marshal((*rawAST)(a))
 	}
-	return MarshalJSON(a, MarshalJSONOptions{})
+	return MarshalJSON(a)
 }
 
 type rawAST AST
 
 type jsonVisitor struct {
 	*bytes.Buffer
-	MarshalJSONOptions
+	marshalJSONOptions
 }
 
 func (w *jsonVisitor) Visit(node Node, next func() error) error {
@@ -58,7 +68,7 @@ func (w *jsonVisitor) Visit(node Node, next func() error) error {
 
 	case *Block:
 		fmt.Fprintf(w, "%q:{", node.Name)
-		if w.Comments && len(node.Comments) > 0 {
+		if w.comments && len(node.Comments) > 0 {
 			fmt.Fprint(w, `"__comments__":`)
 			if err := json.NewEncoder(w).Encode(node.Comments); err != nil {
 				return err
@@ -83,7 +93,7 @@ func (w *jsonVisitor) Visit(node Node, next func() error) error {
 		return nil
 
 	case *Attribute:
-		if w.Comments && len(node.Comments) > 0 {
+		if w.comments && len(node.Comments) > 0 {
 			fmt.Fprintf(w, `"__%s_comments__":`, node.Key)
 			if err := json.NewEncoder(w).Encode(node.Comments); err != nil {
 				return err

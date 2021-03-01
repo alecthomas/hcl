@@ -80,13 +80,13 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalOptions) er
 		seen[key] = entry
 	}
 	// Collect the fields of the target struct.
-	fields, err := flattenFields(v)
+	fields, err := flattenFields(v, opt)
 	if err != nil {
 		return err
 	}
 	// Apply HCL entries to our fields.
 	for _, field := range fields {
-		tag := parseTag(v.Type(), field, opt) // nolint: govet
+		tag := field.tag
 		switch {
 		case tag.name == "":
 			continue
@@ -97,7 +97,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalOptions) er
 
 		case tag.remain:
 			if field.t.Type != remainType {
-				panic(fmt.Sprintf("\"remain\" field %q must be of type []*hcl.Entry but is %T", field.t.Name, field.t.Type))
+				panic(fmt.Sprintf(`"remain" field %q must be of type []*hcl.Entry but is %T`, field.t.Name, field.t.Type))
 			}
 			remaining := []*Entry{}
 			for _, entries := range mentries {
@@ -108,6 +108,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalOptions) er
 			})
 			field.v.Set(reflect.ValueOf(remaining))
 			return nil
+
 		}
 
 		haventSeen := seen[tag.name] == nil
@@ -295,13 +296,13 @@ func checkEnum(v *Value, f field, enum string) error { // nolint: interfacer
 }
 
 func unmarshalBlock(v reflect.Value, block *Block, opt *marshalOptions) error {
-	fields, err := flattenFields(v)
+	fields, err := flattenFields(v, opt)
 	if err != nil {
 		return participle.AnnotateError(block.Pos, err)
 	}
 	labels := block.Labels
 	for _, field := range fields {
-		tag := parseTag(v.Type(), field, opt) // nolint: govet
+		tag := field.tag
 		if tag.name == "" || !tag.label {
 			continue
 		}
@@ -419,12 +420,13 @@ func unmarshalValue(rv reflect.Value, v *Value) error {
 }
 
 type field struct {
-	t reflect.StructField
-	v reflect.Value
+	t   reflect.StructField
+	v   reflect.Value
+	tag tag
 }
 
-func flattenFields(v reflect.Value) ([]field, error) {
-	out := []field{}
+func flattenFields(v reflect.Value, opt *marshalOptions) ([]field, error) {
+	out := make([]field, 0, v.NumField())
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
 		f := v.Field(i)
@@ -433,13 +435,14 @@ func flattenFields(v reflect.Value) ([]field, error) {
 			if f.Kind() != reflect.Struct {
 				return nil, fmt.Errorf("%s: anonymous field must be a struct", ft.Name)
 			}
-			sub, err := flattenFields(f)
+			sub, err := flattenFields(f, opt)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %s", ft.Name, err)
 			}
 			out = append(out, sub...)
 		} else {
-			out = append(out, field{ft, f})
+			tag := parseTag(v.Type(), ft, opt)
+			out = append(out, field{ft, f, tag})
 		}
 	}
 	return out, nil
@@ -467,8 +470,7 @@ func (t tag) comments() []string {
 	return nil
 }
 
-func parseTag(parent reflect.Type, f field, opt *marshalOptions) tag {
-	t := f.t
+func parseTag(parent reflect.Type, t reflect.StructField, opt *marshalOptions) tag {
 	help := t.Tag.Get("help")
 	defaultValue := t.Tag.Get("default")
 	enum := t.Tag.Get("enum")

@@ -113,12 +113,12 @@ func structToEntries(v reflect.Value, schema bool, opt *marshalOptions) (entries
 		}
 		v = v.Elem()
 	}
-	fields, err := flattenFields(v)
+	fields, err := flattenFields(v, opt)
 	if err != nil {
 		return nil, nil, err
 	}
 	for _, field := range fields {
-		tag := parseTag(v.Type(), field, opt)
+		tag := field.tag
 		switch {
 		case tag.label:
 			if schema {
