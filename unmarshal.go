@@ -86,7 +86,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalOptions) er
 	}
 	// Apply HCL entries to our fields.
 	for _, field := range fields {
-		tag := field.tag
+		tag := field.tag // nolint: govet
 		switch {
 		case tag.name == "":
 			continue
@@ -302,7 +302,7 @@ func unmarshalBlock(v reflect.Value, block *Block, opt *marshalOptions) error {
 	}
 	labels := block.Labels
 	for _, field := range fields {
-		tag := field.tag
+		tag := field.tag // nolint: govet
 		if tag.name == "" || !tag.label {
 			continue
 		}
@@ -316,6 +316,7 @@ func unmarshalBlock(v reflect.Value, block *Block, opt *marshalOptions) error {
 		labels = labels[1:]
 		field.v.SetString(label)
 	}
+	fmt.Println(v.Type())
 	if len(labels) > 0 {
 		return participle.Errorf(block.Pos, "too many labels for block %q", block.Name)
 	}
@@ -441,7 +442,7 @@ func flattenFields(v reflect.Value, opt *marshalOptions) ([]field, error) {
 			}
 			out = append(out, sub...)
 		} else {
-			tag := parseTag(v.Type(), ft, opt)
+			tag := parseTag(v.Type(), ft, opt) // nolint: govet
 			out = append(out, field{ft, f, tag})
 		}
 	}

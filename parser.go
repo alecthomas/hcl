@@ -16,6 +16,9 @@ import (
 	"github.com/alecthomas/repr"
 )
 
+// Position in source file.
+type Position = lexer.Position
+
 // Node is the the interface implemented by all AST nodes.
 type Node interface {
 	children() (children []Node)

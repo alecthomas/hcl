@@ -823,3 +823,24 @@ refs {
 	require.NoError(t, err)
 	require.Equal(t, actual, expected)
 }
+
+func TestOrder(t *testing.T) {
+	type A struct {
+		Pos Position `hcl:"-"`
+	}
+	type B struct {
+		Pos Position `hcl:"-"`
+	}
+	type Main struct {
+		A []*A `hcl:"a,block"`
+		B []*B `hcl:"b,block"`
+	}
+	var actual Main
+	err := Unmarshal([]byte(`
+a {}
+b {}
+a {}
+b {}
+`), &actual)
+	require.NoError(t, err)
+}
