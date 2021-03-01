@@ -17,7 +17,9 @@ import (
 )
 
 // Node is the the interface implemented by all AST nodes.
-type Node interface{ node() }
+type Node interface {
+	children() (children []Node)
+}
 
 // AST for HCL.
 type AST struct {
@@ -46,7 +48,12 @@ func (a *AST) Clone() *AST {
 	return out
 }
 
-func (*AST) node() {}
+func (a *AST) children() (children []Node) {
+	for _, entry := range a.Entries {
+		children = append(children, entry)
+	}
+	return
+}
 
 // Entry at the top-level of a HCL file or block.
 type Entry struct {
@@ -57,7 +64,9 @@ type Entry struct {
 	Block     *Block     `parser:"  | @@ )" json:"block,omitempty"`
 }
 
-func (*Entry) node() {}
+func (e *Entry) children() (children []Node) {
+	return []Node{e.Attribute, e.Block}
+}
 
 // Key of the attribute or block.
 func (e *Entry) Key() string {
@@ -105,7 +114,9 @@ type Attribute struct {
 	Optional bool `parser:"" json:"optional,omitempty"`
 }
 
-func (*Attribute) node() {}
+func (a *Attribute) children() (children []Node) {
+	return []Node{a.Value, a.Default}
+}
 
 func (a *Attribute) String() string {
 	return fmt.Sprintf("%s = %s", a.Key, a.Value)
@@ -142,7 +153,12 @@ type Block struct {
 	Repeated bool `parser:"" json:"repeated,omitempty"`
 }
 
-func (*Block) node() {}
+func (b *Block) children() (children []Node) {
+	for _, entry := range b.Body {
+		children = append(children, entry)
+	}
+	return
+}
 
 // Clone the AST.
 func (b *Block) Clone() *Block {
@@ -175,7 +191,9 @@ type MapEntry struct {
 	Value *Value `parser:"@@" json:"value"`
 }
 
-func (*MapEntry) node() {}
+func (e *MapEntry) children() (children []Node) {
+	return []Node{e.Key, e.Value}
+}
 
 // Clone the AST.
 func (e *MapEntry) Clone() *MapEntry {
@@ -239,7 +257,15 @@ func (v *Value) Clone() *Value {
 	return out
 }
 
-func (*Value) node() {}
+func (v *Value) children() (children []Node) {
+	for _, el := range v.List {
+		children = append(children, el)
+	}
+	for _, el := range v.Map {
+		children = append(children, el)
+	}
+	return
+}
 
 func (v *Value) String() string {
 	switch {
@@ -257,7 +283,7 @@ func (v *Value) String() string {
 		if v.Heredoc != nil {
 			heredoc = *v.Heredoc
 		}
-		return fmt.Sprintf("<<%s%s\n%s", v.HeredocDelimiter, heredoc, v.HeredocDelimiter)
+		return fmt.Sprintf("<<%s%s\n%s", v.HeredocDelimiter, heredoc, strings.TrimPrefix(v.HeredocDelimiter, "-"))
 
 	case v.HaveList:
 		entries := []string{}

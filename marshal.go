@@ -18,7 +18,8 @@ import (
 
 // marshalOptions defines options for the marshalling/unmarshalling process
 type marshalOptions struct {
-	inferHCLTags bool
+	inferHCLTags         bool
+	hereDocsForMultiline int
 }
 
 // MarshalOption configures optional marshalling behaviour.
@@ -33,6 +34,14 @@ func InferHCLTags(v bool) MarshalOption {
 	}
 }
 
+// HereDocsForMultiLine will marshal multi-line strings >= n lines as indented
+// heredocs rather than quoted strings.
+func HereDocsForMultiLine(n int) MarshalOption {
+	return func(options *marshalOptions) {
+		options.hereDocsForMultiline = n
+	}
+}
+
 // newMarshalOptions creates marshal options from a set of options
 func newMarshalOptions(options ...MarshalOption) *marshalOptions {
 	opt := &marshalOptions{}
@@ -44,10 +53,6 @@ func newMarshalOptions(options ...MarshalOption) *marshalOptions {
 
 // Marshal a Go type to HCL.
 func Marshal(v interface{}, options ...MarshalOption) ([]byte, error) {
-	opt := &marshalOptions{}
-	for _, option := range options {
-		option(opt)
-	}
 	ast, err := MarshalToAST(v, options...)
 	if err != nil {
 		return nil, err
@@ -149,7 +154,7 @@ func structToEntries(v reflect.Value, schema bool, opt *marshalOptions) (entries
 			}
 
 		default:
-			attr, err := fieldToAttr(field, tag, schema)
+			attr, err := fieldToAttr(field, tag, schema, opt)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -165,7 +170,7 @@ func structToEntries(v reflect.Value, schema bool, opt *marshalOptions) (entries
 	return entries, labels, nil
 }
 
-func fieldToAttr(field field, tag tag, schema bool) (*Attribute, error) {
+func fieldToAttr(field field, tag tag, schema bool, opt *marshalOptions) (*Attribute, error) {
 	attr := &Attribute{
 		Key:      tag.name,
 		Comments: tag.comments(),
@@ -174,7 +179,7 @@ func fieldToAttr(field field, tag tag, schema bool) (*Attribute, error) {
 	if schema {
 		attr.Value, err = attrSchema(field.v.Type())
 	} else {
-		attr.Value, err = valueToValue(field.v)
+		attr.Value, err = valueToValue(field.v, opt)
 	}
 	if err != nil {
 		return nil, err
@@ -338,7 +343,7 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 	return nil, fmt.Errorf("only primitive types, map & slices can have tag value, not %q", f.v.Kind())
 }
 
-func valueToValue(v reflect.Value) (*Value, error) {
+func valueToValue(v reflect.Value, opt *marshalOptions) (*Value, error) {
 	// Special cased types.
 	t := v.Type()
 	if t == durationType {
@@ -364,13 +369,17 @@ func valueToValue(v reflect.Value) (*Value, error) {
 	switch t.Kind() {
 	case reflect.String:
 		s := v.Interface().(string)
-		return &Value{Str: &s}, nil
+		if opt.hereDocsForMultiline == 0 || strings.Count(s, "\n") < opt.hereDocsForMultiline {
+			return &Value{Str: &s}, nil
+		}
+		s = "\n" + s
+		return &Value{HeredocDelimiter: "-EOF", Heredoc: &s}, nil
 
 	case reflect.Slice:
 		list := []*Value{}
 		for i := 0; i < v.Len(); i++ {
 			el := v.Index(i)
-			elv, err := valueToValue(el)
+			elv, err := valueToValue(el, opt)
 			if err != nil {
 				return nil, err
 			}
@@ -388,7 +397,7 @@ func valueToValue(v reflect.Value) (*Value, error) {
 			return sorted[i].String() < sorted[j].String()
 		})
 		for _, key := range sorted {
-			value, err := valueToValue(v.MapIndex(key))
+			value, err := valueToValue(v.MapIndex(key), opt)
 			if err != nil {
 				return nil, err
 			}

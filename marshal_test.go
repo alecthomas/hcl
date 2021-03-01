@@ -85,6 +85,29 @@ func TestMarshal(t *testing.T) {
 		expected string
 		options  []MarshalOption
 	}{
+		{name: "Heredocs",
+			src: &struct {
+				Nested struct {
+					Str string `hcl:"str"`
+				} `hcl:"nested,block"`
+			}{
+				Nested: struct {
+					Str string `hcl:"str"`
+				}{
+					Str: "hello\nworld\nwhat's",
+				},
+			},
+			expected: `
+nested {
+  str = <<-EOF
+hello
+world
+what's
+EOF
+}
+`,
+			options: []MarshalOption{HereDocsForMultiLine(2)},
+		},
 		{name: "Scalars",
 			src: &struct {
 				Str   string  `hcl:"str"`

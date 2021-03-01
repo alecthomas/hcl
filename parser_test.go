@@ -174,7 +174,7 @@ func TestHeredocIndented(t *testing.T) {
 	doc = <<-EOF
 	some thing
 	or another
-EOF
+	EOF
 `)
 	require.NoError(t, err)
 	expected := "some thing\nor another"
