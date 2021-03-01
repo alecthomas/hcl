@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sort"
 	"strconv"
 	"testing"
 	"time"
@@ -831,10 +832,21 @@ func TestOrder(t *testing.T) {
 	type B struct {
 		Pos Position `hcl:"-"`
 	}
+	type Blocks struct {
+		A *A
+		B *B
+	}
+	pos := func(b *Blocks) Position {
+		if b.A != nil {
+			return b.A.Pos
+		}
+		return b.B.Pos
+	}
 	type Main struct {
 		A []*A `hcl:"a,block"`
 		B []*B `hcl:"b,block"`
 	}
+
 	var actual Main
 	err := Unmarshal([]byte(`
 a {}
@@ -843,4 +855,21 @@ a {}
 b {}
 `), &actual)
 	require.NoError(t, err)
+	blocks := []*Blocks{}
+	for _, a := range actual.A {
+		blocks = append(blocks, &Blocks{A: a})
+	}
+	for _, b := range actual.B {
+		blocks = append(blocks, &Blocks{B: b})
+	}
+	sort.Slice(blocks, func(i, j int) bool {
+		return pos(blocks[i]).Line < pos(blocks[j]).Line
+	})
+	expected := []*Blocks{
+		{A: &A{Pos: Position{Offset: 1, Line: 2, Column: 1}}},
+		{B: &B{Pos: Position{Offset: 6, Line: 3, Column: 1}}},
+		{A: &A{Pos: Position{Offset: 11, Line: 4, Column: 1}}},
+		{B: &B{Pos: Position{Offset: 16, Line: 5, Column: 1}}},
+	}
+	require.Equal(t, expected, blocks)
 }

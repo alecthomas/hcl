@@ -296,6 +296,9 @@ func checkEnum(v *Value, f field, enum string) error { // nolint: interfacer
 }
 
 func unmarshalBlock(v reflect.Value, block *Block, opt *marshalOptions) error {
+	if pos := v.FieldByName("Pos"); pos.IsValid() {
+		pos.Set(reflect.ValueOf(block.Pos))
+	}
 	fields, err := flattenFields(v, opt)
 	if err != nil {
 		return participle.AnnotateError(block.Pos, err)
@@ -316,7 +319,6 @@ func unmarshalBlock(v reflect.Value, block *Block, opt *marshalOptions) error {
 		labels = labels[1:]
 		field.v.SetString(label)
 	}
-	fmt.Println(v.Type())
 	if len(labels) > 0 {
 		return participle.Errorf(block.Pos, "too many labels for block %q", block.Name)
 	}
