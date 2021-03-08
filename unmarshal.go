@@ -39,7 +39,7 @@ func UnmarshalAST(ast *AST, v interface{}, options ...MarshalOption) error {
 	if rv.Kind() != reflect.Ptr {
 		return fmt.Errorf("%T must be a pointer", v)
 	}
-	opt := &marshalOptions{}
+	opt := &marshalState{}
 	for _, option := range options {
 		option(opt)
 	}
@@ -53,14 +53,14 @@ func UnmarshalBlock(block *Block, v interface{}, options ...MarshalOption) error
 		return fmt.Errorf("%T must be a pointer to a struct", v)
 	}
 	rv = rv.Elem()
-	opt := &marshalOptions{}
+	opt := &marshalState{}
 	for _, option := range options {
 		option(opt)
 	}
 	return unmarshalBlock(rv, block, opt)
 }
 
-func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalOptions) error {
+func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) error {
 	if v.Kind() != reflect.Struct {
 		return fmt.Errorf("%T must be a struct", v.Interface())
 	}
@@ -295,7 +295,7 @@ func checkEnum(v *Value, f field, enum string) error { // nolint: interfacer
 	}
 }
 
-func unmarshalBlock(v reflect.Value, block *Block, opt *marshalOptions) error {
+func unmarshalBlock(v reflect.Value, block *Block, opt *marshalState) error {
 	if pos := v.FieldByName("Pos"); pos.IsValid() {
 		pos.Set(reflect.ValueOf(block.Pos))
 	}
@@ -428,7 +428,7 @@ type field struct {
 	tag tag
 }
 
-func flattenFields(v reflect.Value, opt *marshalOptions) ([]field, error) {
+func flattenFields(v reflect.Value, opt *marshalState) ([]field, error) {
 	out := make([]field, 0, v.NumField())
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
@@ -473,7 +473,7 @@ func (t tag) comments() []string {
 	return nil
 }
 
-func parseTag(parent reflect.Type, t reflect.StructField, opt *marshalOptions) tag {
+func parseTag(parent reflect.Type, t reflect.StructField, opt *marshalState) tag {
 	help := t.Tag.Get("help")
 	defaultValue := t.Tag.Get("default")
 	enum := t.Tag.Get("enum")

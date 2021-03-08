@@ -60,8 +60,9 @@ func (a *AST) children() (children []Node) {
 
 // Entry at the top-level of a HCL file or block.
 type Entry struct {
-	Pos    lexer.Position `parser:"" json:"-"`
-	Parent Node           `parser:"" json:"-"`
+	Pos             lexer.Position `parser:"" json:"-"`
+	Parent          Node           `parser:"" json:"-"`
+	RecursiveSchema bool           `parser:"" json:"-"`
 
 	Attribute *Attribute `parser:"(   @@" json:"attribute,omitempty"`
 	Block     *Block     `parser:"  | @@ )" json:"block,omitempty"`

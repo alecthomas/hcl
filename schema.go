@@ -9,7 +9,7 @@ import (
 //
 // A schema is itself HCL.
 func Schema(v interface{}, options ...MarshalOption) (*AST, error) {
-	ast, err := marshalToAST(v, true, newMarshalOptions(options...))
+	ast, err := marshalToAST(v, true, newMarshalState(options...))
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func BlockSchema(name string, v interface{}, options ...MarshalOption) (*AST, er
 	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Struct {
 		return nil, fmt.Errorf("expected a pointer to a struct not %T", v)
 	}
-	block, err := valueToBlock(rv.Elem(), tag{name: name, block: true}, true, newMarshalOptions(options...))
+	block, err := valueToBlock(rv.Elem(), tag{name: name, block: true}, true, newMarshalState(options...))
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func attrSchema(t reflect.Type) (*Value, error) {
 	}
 }
 
-func sliceToBlockSchema(t reflect.Type, tag tag, opt *marshalOptions) (*Block, error) {
+func sliceToBlockSchema(t reflect.Type, tag tag, opt *marshalState) (*Block, error) {
 	block := &Block{
 		Name:     tag.name,
 		Comments: tag.comments(),

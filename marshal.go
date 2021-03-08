@@ -16,20 +16,21 @@ import (
 	"github.com/alecthomas/participle/lexer"
 )
 
-// marshalOptions defines options for the marshalling/unmarshalling process
-type marshalOptions struct {
+// marshalState defines options and state for the marshalling/unmarshalling process
+type marshalState struct {
 	inferHCLTags         bool
 	hereDocsForMultiline int
+	seenStructs          map[reflect.Type]bool
 }
 
 // MarshalOption configures optional marshalling behaviour.
-type MarshalOption func(options *marshalOptions)
+type MarshalOption func(options *marshalState)
 
 // InferHCLTags specifies whether to infer behaviour if hcl:"" tags are not present.
 //
 // This currently just means that all structs become blocks.
 func InferHCLTags(v bool) MarshalOption {
-	return func(options *marshalOptions) {
+	return func(options *marshalState) {
 		options.inferHCLTags = v
 	}
 }
@@ -37,14 +38,16 @@ func InferHCLTags(v bool) MarshalOption {
 // HereDocsForMultiLine will marshal multi-line strings >= n lines as indented
 // heredocs rather than quoted strings.
 func HereDocsForMultiLine(n int) MarshalOption {
-	return func(options *marshalOptions) {
+	return func(options *marshalState) {
 		options.hereDocsForMultiline = n
 	}
 }
 
-// newMarshalOptions creates marshal options from a set of options
-func newMarshalOptions(options ...MarshalOption) *marshalOptions {
-	opt := &marshalOptions{}
+// newMarshalState creates marshal options from a set of options
+func newMarshalState(options ...MarshalOption) *marshalState {
+	opt := &marshalState{
+		seenStructs: map[reflect.Type]bool{},
+	}
 	for _, option := range options {
 		option(opt)
 	}
@@ -62,7 +65,7 @@ func Marshal(v interface{}, options ...MarshalOption) ([]byte, error) {
 
 // MarshalToAST marshals a Go type to a hcl.AST.
 func MarshalToAST(v interface{}, options ...MarshalOption) (*AST, error) {
-	return marshalToAST(v, false, newMarshalOptions(options...))
+	return marshalToAST(v, false, newMarshalState(options...))
 }
 
 // MarshalAST marshals an AST to HCL bytes.
@@ -77,7 +80,7 @@ func MarshalASTToWriter(ast Node, w io.Writer) error {
 	return marshalNode(w, "", ast)
 }
 
-func marshalToAST(v interface{}, schema bool, opt *marshalOptions) (*AST, error) {
+func marshalToAST(v interface{}, schema bool, opt *marshalState) (*AST, error) {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr {
 		return nil, fmt.Errorf("expected a pointer to a struct, not %T", v)
@@ -103,7 +106,7 @@ func marshalToAST(v interface{}, schema bool, opt *marshalOptions) (*AST, error)
 	return ast, nil
 }
 
-func structToEntries(v reflect.Value, schema bool, opt *marshalOptions) (entries []*Entry, labels []string, err error) {
+func structToEntries(v reflect.Value, schema bool, opt *marshalState) (entries []*Entry, labels []string, err error) {
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
 			if !schema {
@@ -113,6 +116,16 @@ func structToEntries(v reflect.Value, schema bool, opt *marshalOptions) (entries
 		}
 		v = v.Elem()
 	}
+
+	// Check for recursive structures.
+	if schema && opt.seenStructs[v.Type()] {
+		return []*Entry{
+			{RecursiveSchema: true},
+		}, nil, nil
+	}
+	opt.seenStructs[v.Type()] = true
+	defer delete(opt.seenStructs, v.Type())
+
 	fields, err := flattenFields(v, opt)
 	if err != nil {
 		return nil, nil, err
@@ -170,7 +183,7 @@ func structToEntries(v reflect.Value, schema bool, opt *marshalOptions) (entries
 	return entries, labels, nil
 }
 
-func fieldToAttr(field field, tag tag, schema bool, opt *marshalOptions) (*Attribute, error) {
+func fieldToAttr(field field, tag tag, schema bool, opt *marshalState) (*Attribute, error) {
 	attr := &Attribute{
 		Key:      tag.name,
 		Comments: tag.comments(),
@@ -343,7 +356,7 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 	return nil, fmt.Errorf("only primitive types, map & slices can have tag value, not %q", f.v.Kind())
 }
 
-func valueToValue(v reflect.Value, opt *marshalOptions) (*Value, error) {
+func valueToValue(v reflect.Value, opt *marshalState) (*Value, error) {
 	// Special cased types.
 	t := v.Type()
 	if t == durationType {
@@ -434,7 +447,7 @@ func valueToValue(v reflect.Value, opt *marshalOptions) (*Value, error) {
 	}
 }
 
-func valueToBlock(v reflect.Value, tag tag, schema bool, opt *marshalOptions) (*Block, error) {
+func valueToBlock(v reflect.Value, tag tag, schema bool, opt *marshalState) (*Block, error) {
 	block := &Block{
 		Name:     tag.name,
 		Comments: tag.comments(),
@@ -444,7 +457,7 @@ func valueToBlock(v reflect.Value, tag tag, schema bool, opt *marshalOptions) (*
 	return block, err
 }
 
-func sliceToBlocks(sv reflect.Value, tag tag, opt *marshalOptions) ([]*Block, error) {
+func sliceToBlocks(sv reflect.Value, tag tag, opt *marshalState) ([]*Block, error) {
 	blocks := []*Block{}
 	for i := 0; i != sv.Len(); i++ {
 		block, err := valueToBlock(sv.Index(i), tag, false, opt)
@@ -499,6 +512,8 @@ func marshalEntries(w io.Writer, indent string, entries []*Entry) error {
 				return err
 			}
 			prevAttr = true
+		} else if entry.RecursiveSchema {
+			fmt.Fprintf(w, "%s// (recursive)\n", indent)
 		} else {
 			panic("??")
 		}

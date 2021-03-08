@@ -272,3 +272,25 @@ refs { // (repeated)
     `
 	require.Equal(t, strings.TrimSpace(expectedSchema), strings.TrimSpace(string(data)))
 }
+
+type RecursiveSchema struct {
+	Name      string           `hcl:"name" help:"Name of user."`
+	Age       int              `hcl:"age,optional" help:"Age of user."`
+	Recursive *RecursiveSchema `hcl:"recursive,block"`
+}
+
+func TestRecursiveSchema(t *testing.T) {
+	ast, err := Schema(&RecursiveSchema{})
+	require.NoError(t, err)
+	schema, err := MarshalAST(ast)
+	require.NoError(t, err)
+	require.Equal(t, `// Name of user.
+name = string
+// Age of user.
+age = number // (optional)
+
+recursive {
+  // (recursive)
+}
+`, string(schema))
+}
