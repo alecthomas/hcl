@@ -37,6 +37,8 @@ type objectRef struct {
 }
 
 type jsonTaggedSchema struct {
+	Pos Position `json:"-"`
+
 	Str     string      `json:"str"`
 	Config  keyValue    `json:"config"`
 	Options *keyValue   `json:"options,omitempty"`

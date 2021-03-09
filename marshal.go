@@ -133,6 +133,7 @@ func structToEntries(v reflect.Value, schema bool, opt *marshalState) (entries [
 	for _, field := range fields {
 		tag := field.tag
 		switch {
+		case tag.name == "": // Skip
 		case tag.label:
 			if schema {
 				labels = append(labels, tag.name)
@@ -504,7 +505,7 @@ func marshalEntries(w io.Writer, indent string, entries []*Entry) error {
 				return err
 			}
 			prevAttr = false
-		} else if attr := entry.Attribute; attr != nil {
+		} else if attr := entry.Attribute; attr != nil { // nolint: gocritic
 			if !prevAttr {
 				fmt.Fprintln(w)
 			}
