@@ -251,7 +251,7 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 	case reflect.String:
 		return &Value{Str: &defaultValue}, nil
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		n, err := strconv.ParseInt(defaultValue, 10, 64)
+		n, err := strconv.ParseInt(defaultValue, 0, 64)
 		if err != nil {
 			return nil, fmt.Errorf("error converting %q to int", defaultValue)
 		}
@@ -259,7 +259,7 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 			Number: big.NewFloat(0).SetInt64(n),
 		}, nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		n, err := strconv.ParseUint(defaultValue, 10, 64)
+		n, err := strconv.ParseUint(defaultValue, 0, 64)
 		if err != nil {
 			return nil, fmt.Errorf("error converting %q to uint", defaultValue)
 		}
@@ -267,7 +267,11 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 			Number: big.NewFloat(0).SetUint64(n),
 		}, nil
 	case reflect.Float32, reflect.Float64:
-		n, err := strconv.ParseFloat(defaultValue, 10)
+		size := 64
+		if k == reflect.Float32 {
+			size = 32
+		}
+		n, err := strconv.ParseFloat(defaultValue, size)
 		if err != nil {
 			return nil, fmt.Errorf("error converting %q to float", defaultValue)
 		}
