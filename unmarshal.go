@@ -416,14 +416,17 @@ func unmarshalValue(rv reflect.Value, v *Value, opt *marshalState) error {
 
 	case reflect.Bool:
 		var ok bool
-		if v == nil {
+		switch {
+		case v == nil:
 			if !opt.bareAttr {
 				return fmt.Errorf("expected = after attribute")
 			}
 			ok = true
-		} else if v.Bool == nil {
+
+		case v.Bool == nil:
 			return participle.Errorf(v.Pos, "expected a bool but got %s", v)
-		} else {
+
+		default:
 			ok = bool(*v.Bool)
 		}
 		rv.SetBool(ok)
