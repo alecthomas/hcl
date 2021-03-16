@@ -64,8 +64,8 @@ type Entry struct {
 	Parent          Node           `parser:"" json:"-"`
 	RecursiveSchema bool           `parser:"" json:"-"`
 
-	Attribute *Attribute `parser:"(   @@" json:"attribute,omitempty"`
-	Block     *Block     `parser:"  | @@ )" json:"block,omitempty"`
+	Block     *Block     `parser:"(   @@" json:"block,omitempty"`
+	Attribute *Attribute `parser:"  | @@ )" json:"attribute,omitempty"`
 }
 
 func (e *Entry) children() (children []Node) {
@@ -105,8 +105,8 @@ type Attribute struct {
 
 	Comments []string `parser:"@Comment*" json:"comments,omitempty"`
 
-	Key   string `parser:"@Ident '='" json:"key"`
-	Value *Value `parser:"@@" json:"value"`
+	Key   string `parser:"@Ident ['='" json:"key"`
+	Value *Value `parser:"@@]" json:"value"`
 
 	// This will be populated during unmarshalling.
 	Default *Value `parser:"" json:"default,omitempty"`

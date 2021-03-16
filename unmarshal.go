@@ -128,7 +128,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 				if err != nil {
 					return fmt.Errorf("default value conflicts with enum: %v", err)
 				}
-				err = unmarshalValue(field.v, v)
+				err = unmarshalValue(field.v, v, opt)
 				if err != nil {
 					return fmt.Errorf("error applying default value to field %q, %v", field.t.Name, err)
 				}
@@ -166,7 +166,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 					return participle.Wrapf(val.Pos, err, "invalid value")
 				}
 				continue
-			} else if entry.Attribute.Value.Str != nil {
+			} else if val != nil && val.Str != nil {
 				switch field.v.Interface().(type) {
 				case time.Duration:
 					d, err := time.ParseDuration(*val.Str)
@@ -244,9 +244,13 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 			if err != nil {
 				return err
 			}
-			err = unmarshalValue(field.v, value)
+			err = unmarshalValue(field.v, value, opt)
 			if err != nil {
-				return participle.AnnotateError(value.Pos, err)
+				pos := entry.Attribute.Pos
+				if value != nil {
+					pos = value.Pos
+				}
+				return participle.AnnotateError(pos, err)
 			}
 		}
 	}
@@ -266,7 +270,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 }
 
 func checkEnum(v *Value, f field, enum string) error { // nolint: interfacer
-	if enum == "" {
+	if enum == "" || v == nil {
 		return nil
 	}
 
@@ -325,7 +329,7 @@ func unmarshalBlock(v reflect.Value, block *Block, opt *marshalState) error {
 	return unmarshalEntries(v, block.Body, opt)
 }
 
-func unmarshalValue(rv reflect.Value, v *Value) error {
+func unmarshalValue(rv reflect.Value, v *Value, opt *marshalState) error {
 	switch rv.Kind() {
 	case reflect.String:
 		switch {
@@ -380,7 +384,7 @@ func unmarshalValue(rv reflect.Value, v *Value) error {
 			default:
 				panic(fmt.Errorf("map key must be a string or type but is %s", entry.Key))
 			}
-			err := unmarshalValue(value, entry.Value)
+			err := unmarshalValue(value, entry.Value, opt)
 			if err != nil {
 				return participle.Wrapf(entry.Value.Pos, err, "invalid map value")
 			}
@@ -395,7 +399,7 @@ func unmarshalValue(rv reflect.Value, v *Value) error {
 		lv := reflect.MakeSlice(rv.Type(), 0, 4)
 		for _, entry := range v.List {
 			value := reflect.New(t).Elem()
-			err := unmarshalValue(value, entry)
+			err := unmarshalValue(value, entry, opt)
 			if err != nil {
 				return participle.Wrapf(entry.Pos, err, "invalid list element")
 			}
@@ -408,13 +412,21 @@ func unmarshalValue(rv reflect.Value, v *Value) error {
 			pv := reflect.New(rv.Type().Elem())
 			rv.Set(pv)
 		}
-		return unmarshalValue(rv.Elem(), v)
+		return unmarshalValue(rv.Elem(), v, opt)
 
 	case reflect.Bool:
-		if v.Bool == nil {
+		var ok bool
+		if v == nil {
+			if !opt.bareAttr {
+				return fmt.Errorf("expected = after attribute")
+			}
+			ok = true
+		} else if v.Bool == nil {
 			return participle.Errorf(v.Pos, "expected a bool but got %s", v)
+		} else {
+			ok = bool(*v.Bool)
 		}
-		rv.SetBool(bool(*v.Bool))
+		rv.SetBool(ok)
 
 	default:
 		panic(rv.Kind().String())

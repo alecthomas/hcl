@@ -153,6 +153,11 @@ EOF
 				`,
 			expected: hcl(attr("a", str("hello\nworld"))),
 		},
+		{name: "AttributeWithoutValue",
+			hcl: `
+				attr
+				`,
+			expected: hcl(attr("attr", nil))},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -213,6 +218,9 @@ func normaliseEntries(entries []*Entry) {
 }
 
 func normaliseValue(val *Value) {
+	if val == nil {
+		return
+	}
 	val.Pos = lexer.Position{}
 	val.Parent = nil
 	for _, entry := range val.Map {

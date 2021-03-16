@@ -338,7 +338,7 @@ are = true
 				normaliseEntries(i.(*remainStruct).Remain)
 			},
 		},
-		{name: "Unmarshall json tagged struct",
+		{name: "UnmarshallJSONTaggedStruct",
 			hcl: `
                 block {
                     str = "str"
@@ -588,7 +588,7 @@ name = "a"
 `
 	tests := []test{
 		{
-			name: "Wrong Int",
+			name: "WrongInt",
 			hcl:  hcl,
 			dest: struct {
 				Name string `hcl:"name"`
@@ -599,7 +599,7 @@ name = "a"
 			fail: `error parsing default value: error converting "abc" to int`,
 		},
 		{
-			name: "Wrong Float",
+			name: "WrongFloat",
 			hcl:  hcl,
 			dest: struct {
 				Name  string  `hcl:"name"`
@@ -610,7 +610,7 @@ name = "a"
 			fail: `error parsing default value: error converting "abc" to float`,
 		},
 		{
-			name: "Wrong Bool",
+			name: "WrongBool",
 			hcl:  hcl,
 			dest: struct {
 				Name string `hcl:"name"`
@@ -621,7 +621,7 @@ name = "a"
 			fail: `error parsing default value: error converting "abc" to bool`,
 		},
 		{
-			name: "Wrong Map",
+			name: "WrongMap",
 			hcl:  hcl,
 			dest: struct {
 				Name string           `hcl:"name"`
@@ -632,7 +632,7 @@ name = "a"
 			fail: `error parsing default value: error parsing map "abc" into pairs`,
 		},
 		{
-			name: "Wrong Map Value",
+			name: "WrongMapValue",
 			hcl:  hcl,
 			dest: struct {
 				Name string           `hcl:"name"`
@@ -643,7 +643,7 @@ name = "a"
 			fail: `error parsing default value: error parsing map "test" into value, error parsing default value: error converting "test" to int`,
 		},
 		{
-			name: "Wrong Map Separator",
+			name: "WrongMapSeparator",
 			hcl:  hcl,
 			dest: struct {
 				Name string           `hcl:"name"`
@@ -654,7 +654,7 @@ name = "a"
 			fail: `error parsing default value: error parsing map "2,key2" into value, error parsing default value: error converting "2,key2" to int`,
 		},
 		{
-			name: "Wrong Slice",
+			name: "WrongSlice",
 			hcl:  hcl,
 			dest: struct {
 				Name string  `hcl:"name"`
@@ -698,7 +698,7 @@ float_val = 2.11
 func TestEnumInvalidCases(t *testing.T) {
 	tests := []test{
 		{
-			name: "String Mismatch",
+			name: "StringMismatch",
 			hcl: `
 name = "test"
 `,
@@ -710,7 +710,7 @@ name = "test"
 			fail: `value "test" does not match anything within enum "a", "b", "c"`,
 		},
 		{
-			name: "Float Mismatch",
+			name: "FloatMismatch",
 			hcl: `
 val = 2.33
 `,
@@ -722,7 +722,7 @@ val = 2.33
 			fail: `value 2.33 does not match anything within enum 2.11, 2.21, 5.22`,
 		},
 		{
-			name: "Int Mismatch",
+			name: "IntMismatch",
 			hcl: `
 val = 17
 `,
@@ -734,7 +734,7 @@ val = 17
 			fail: `value 17 does not match anything within enum 10, 25, 100`,
 		},
 		{
-			name: "String Default Value Conflicts",
+			name: "StringDefaultValueConflicts",
 			hcl: `
 `,
 			dest: struct {
@@ -745,7 +745,7 @@ val = 17
 			fail: `default value conflicts with enum: value "d" does not match anything within enum "a", "b", "c"`,
 		},
 		{
-			name: "Int Default Value Conflicts",
+			name: "IntDefaultValueConflicts",
 			hcl:  ``,
 			dest: struct {
 				Val int `hcl:"val" enum:"5,8,10" default:"9"`
@@ -755,7 +755,7 @@ val = 17
 			fail: `default value conflicts with enum: value 9 does not match anything within enum 5, 8, 10`,
 		},
 		{
-			name: "Float Default Value Conflicts",
+			name: "FloatDefaultValueConflicts",
 			hcl:  ``,
 			dest: struct {
 				Val float64 `hcl:"val" enum:"5.2,8,10.9" default:"9.01"`
@@ -765,7 +765,7 @@ val = 17
 			fail: `default value conflicts with enum: value 9.01 does not match anything within enum 5.2, 8, 10.9`,
 		},
 		{
-			name: "Int Enum Parse Error",
+			name: "IntEnumParseError",
 			hcl:  ``,
 			dest: struct {
 				Val int32 `hcl:"val" enum:"5.2,8,10.9" default:"9"`
@@ -775,7 +775,7 @@ val = 17
 			fail: `default value conflicts with enum: error parsing enum: error converting "5.2" to int`,
 		},
 		{
-			name: "Float Enum Parse Error",
+			name: "FloatEnumParseError",
 			hcl:  ``,
 			dest: struct {
 				Val float64 `hcl:"val" enum:"5.2,8,a" default:"9.2"`
@@ -783,6 +783,26 @@ val = 17
 				Val: 9.2,
 			},
 			fail: `default value conflicts with enum: error parsing enum: error converting "a" to float`,
+		},
+		{
+			name:    "AttrWithoutValue",
+			hcl:     `attr`,
+			options: []MarshalOption{BareBooleanAttributes(true)},
+			dest: struct {
+				Attr bool `hcl:"attr"`
+			}{
+				Attr: true,
+			},
+		},
+		{
+			name: "AttrWithoutValueNotEnabled",
+			hcl:  `attr`,
+			dest: struct {
+				Attr bool `hcl:"attr"`
+			}{
+				Attr: true,
+			},
+			fail: "1:1: expected = after attribute",
 		},
 	}
 

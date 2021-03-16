@@ -56,6 +56,9 @@ func addParentRefs(parent, node Node) {
 		node.Parent = parent
 
 	case *Value:
+		if node == nil {
+			return
+		}
 		node.Parent = parent
 		switch {
 		case node.HaveList:

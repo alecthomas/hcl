@@ -20,6 +20,7 @@ import (
 type marshalState struct {
 	inferHCLTags         bool
 	hereDocsForMultiline int
+	bareAttr             bool
 	seenStructs          map[reflect.Type]bool
 }
 
@@ -32,6 +33,17 @@ type MarshalOption func(options *marshalState)
 func InferHCLTags(v bool) MarshalOption {
 	return func(options *marshalState) {
 		options.inferHCLTags = v
+	}
+}
+
+// BareBooleanAttributes specifies whether attributes without values will be treated as boolean true values.
+//
+// eg.
+//
+//     attr
+func BareBooleanAttributes(v bool) MarshalOption {
+	return func(options *marshalState) {
+		options.bareAttr = true
 	}
 }
 
