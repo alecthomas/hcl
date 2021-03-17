@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type Number int
+type numberTest int
 
-func (n *Number) UnmarshalJSON(b []byte) error {
+func (n *numberTest) UnmarshalJSON(b []byte) error {
 	s, _ := strconv.Unquote(string(b))
 	switch s {
 	case "one":
@@ -269,9 +269,9 @@ func TestUnmarshal(t *testing.T) {
 				number = "one"
 			`,
 			dest: struct {
-				Number Number `hcl:"number"`
+				NumberTest numberTest `hcl:"number"`
 			}{
-				Number: 1,
+				NumberTest: 1,
 			},
 		},
 		{name: "PointerScalars",
@@ -351,6 +351,13 @@ are = true
 			},
 			options: []MarshalOption{InferHCLTags(true)},
 		},
+		{name: "Octal",
+			hcl: `octal = 0700`,
+			dest: struct {
+				Octal int `hcl:"octal"`
+			}{
+				Octal: 0700,
+			}},
 	}
 	runTests(t, tests)
 }

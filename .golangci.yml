@@ -25,6 +25,7 @@ linters:
     - goerr113
     - testpackage
     - godot
+    - dogsled
 
 linters-settings:
   govet:

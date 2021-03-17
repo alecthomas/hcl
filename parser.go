@@ -217,13 +217,29 @@ type Bool bool
 
 func (b *Bool) Capture(values []string) error { *b = values[0] == "true"; return nil } // nolint: golint
 
+// Number of arbitrary precision.
+type Number struct{ *big.Float }
+
+func (n *Number) GoString() string { return n.String() }
+
+// Capture override because big.Float doesn't directly support 0-prefix octal parsing... why?
+func (n *Number) Capture(values []string) error {
+	value := values[0]
+	if strings.HasPrefix(value, "0") {
+		value = "0o" + value[1:]
+	}
+	n.Float = big.NewFloat(0)
+	_, _, err := n.Float.Parse(value, 0)
+	return err
+}
+
 // Value is a scalar, list or map.
 type Value struct {
 	Pos    lexer.Position `parser:"" json:"-"`
 	Parent Node           `parser:"" json:"-"`
 
 	Bool             *Bool       `parser:"(  @('true' | 'false')" json:"bool,omitempty"`
-	Number           *big.Float  `parser:" | @Number" json:"number,omitempty"`
+	Number           *Number     `parser:" | @Number" json:"number,omitempty"`
 	Type             *string     `parser:" | @('number':Ident | 'string':Ident | 'boolean':Ident)" json:"type,omitempty"`
 	Str              *string     `parser:" | @(String | Ident)" json:"str,omitempty"`
 	HeredocDelimiter string      `parser:" | (@Heredoc" json:"heredoc_delimiter,omitempty"`
@@ -243,8 +259,8 @@ func (v *Value) Clone() *Value {
 	*out = *v
 	switch {
 	case out.Number != nil:
-		out.Number = &big.Float{}
-		out.Number.Copy(v.Number)
+		out.Number = &Number{}
+		out.Number.Float.Copy(v.Number.Float)
 
 	case v.HaveList:
 		out.List = make([]*Value, len(v.List))

@@ -275,6 +275,8 @@ func str(s string) *Value {
 
 func num(n float64) *Value {
 	s := fmt.Sprintf("%g", n)
-	b, _, _ := big.ParseFloat(s, 10, 64, 0)
-	return &Value{Number: b}
+	b := &big.Float{}
+	// b, _, _ := big.ParseFloat(s, 10, 64, 0)
+	_, _, _ = b.Parse(s, 0)
+	return &Value{Number: &Number{b}}
 }

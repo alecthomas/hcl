@@ -268,7 +268,7 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 			return nil, fmt.Errorf("error converting %q to int", defaultValue)
 		}
 		return &Value{
-			Number: big.NewFloat(0).SetInt64(n),
+			Number: &Number{Float: big.NewFloat(0).SetInt64(n)},
 		}, nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		n, err := strconv.ParseUint(defaultValue, 0, 64)
@@ -276,7 +276,7 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 			return nil, fmt.Errorf("error converting %q to uint", defaultValue)
 		}
 		return &Value{
-			Number: big.NewFloat(0).SetUint64(n),
+			Number: &Number{big.NewFloat(0).SetUint64(n)},
 		}, nil
 	case reflect.Float32, reflect.Float64:
 		size := 64
@@ -288,7 +288,7 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 			return nil, fmt.Errorf("error converting %q to float", defaultValue)
 		}
 		return &Value{
-			Number: big.NewFloat(n),
+			Number: &Number{big.NewFloat(n)},
 		}, nil
 	case reflect.Bool:
 		b, err := strconv.ParseBool(defaultValue)
@@ -440,13 +440,13 @@ func valueToValue(v reflect.Value, opt *marshalState) (*Value, error) {
 		return &Value{Map: entries, HaveMap: true}, nil
 
 	case reflect.Float32, reflect.Float64:
-		return &Value{Number: big.NewFloat(v.Float())}, nil
+		return &Value{Number: &Number{big.NewFloat(v.Float())}}, nil
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return &Value{Number: big.NewFloat(0).SetInt64(v.Int())}, nil
+		return &Value{Number: &Number{big.NewFloat(0).SetInt64(v.Int())}}, nil
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return &Value{Number: big.NewFloat(0).SetUint64(v.Uint())}, nil
+		return &Value{Number: &Number{big.NewFloat(0).SetUint64(v.Uint())}}, nil
 
 	case reflect.Bool:
 		b := v.Bool()
