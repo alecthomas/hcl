@@ -316,12 +316,16 @@ func unmarshalBlock(v reflect.Value, block *Block, opt *marshalState) error {
 		if len(labels) == 0 {
 			return participle.Errorf(block.Pos, "missing label %q", tag.name)
 		}
-		if field.v.Kind() != reflect.String {
-			panic("label field " + fieldID(v.Type(), field.t) + " must be a string")
+		if field.v.Kind() == reflect.String {
+			label := labels[0]
+			labels = labels[1:]
+			field.v.SetString(label)
+		} else if field.v.Kind() == reflect.Slice && field.v.Type().Elem().Kind() == reflect.String {
+			field.v.Set(reflect.ValueOf(labels))
+			labels = nil
+		} else {
+			panic("label field " + fieldID(v.Type(), field.t) + " must be string or []string")
 		}
-		label := labels[0]
-		labels = labels[1:]
-		field.v.SetString(label)
 	}
 	if len(labels) > 0 {
 		return participle.Errorf(block.Pos, "too many labels for block %q", block.Name)

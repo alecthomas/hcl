@@ -67,6 +67,10 @@ func TestUnmarshal(t *testing.T) {
 		Name string `hcl:"name,label"`
 		Attr string `hcl:"attr"`
 	}
+	type varArgLabelBlock struct {
+		Path []string `hcl:"path,label"`
+		Attr string   `hcl:"attr"`
+	}
 	type jsonStrBlock struct {
 		Str string `json:"str"`
 	}
@@ -191,6 +195,21 @@ func TestUnmarshal(t *testing.T) {
 			}{
 				Block: labelledBlock{
 					Name: "name",
+					Attr: "attr",
+				},
+			},
+		},
+		{name: "BlockWithVarArgLabels",
+			hcl: `
+				block multiple labels varargs {
+					attr = "attr"
+				}
+			`,
+			dest: struct {
+				Block varArgLabelBlock `hcl:"block,block"`
+			}{
+				Block: varArgLabelBlock{
+					Path: []string{"multiple", "labels", "varargs"},
 					Attr: "attr",
 				},
 			},

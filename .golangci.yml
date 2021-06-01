@@ -33,6 +33,7 @@ linters:
     - cyclop
     - errorlint
     - nlreturn
+    - gocritic
 
 linters-settings:
   govet:

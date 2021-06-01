@@ -150,7 +150,11 @@ func structToEntries(v reflect.Value, schema bool, opt *marshalState) (entries [
 			if schema {
 				labels = append(labels, tag.name)
 			} else {
-				labels = append(labels, field.v.String())
+				if field.v.Kind() == reflect.String {
+					labels = append(labels, field.v.String())
+				} else if field.v.Kind() == reflect.Slice && field.v.Type().Elem().Kind() == reflect.String {
+					labels = append(labels, field.v.Interface().([]string)...)
+				}
 			}
 
 		case tag.block:

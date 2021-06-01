@@ -79,12 +79,28 @@ func (j *jsonMarshalValue) MarshalJSON() ([]byte, error) {
 func TestMarshal(t *testing.T) {
 	timestamp, err := time.Parse(time.RFC3339, "2020-01-02T15:04:05Z")
 	require.NoError(t, err)
+	type varArgLabelBlock struct {
+		Path []string `hcl:"path,label"`
+	}
 	tests := []struct {
 		name     string
 		src      interface{}
 		expected string
 		options  []MarshalOption
 	}{
+		{name: "VarArgBlockLabels",
+			src: &struct {
+				Block varArgLabelBlock `hcl:"block,block"`
+			}{
+				Block: varArgLabelBlock{
+					Path: []string{"multiple", "labels", "varargs"},
+				},
+			},
+			expected: `
+block "multiple" "labels" "varargs" {
+}
+`,
+		},
 		{name: "Heredocs",
 			src: &struct {
 				Nested struct {
