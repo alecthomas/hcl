@@ -368,9 +368,9 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 			HaveList: true,
 			List:     slice,
 		}, nil
+	default:
+		return nil, fmt.Errorf("only primitive types, map & slices can have tag value, not %q", f.v.Kind())
 	}
-
-	return nil, fmt.Errorf("only primitive types, map & slices can have tag value, not %q", f.v.Kind())
 }
 
 func valueToValue(v reflect.Value, opt *marshalState) (*Value, error) {

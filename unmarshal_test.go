@@ -38,6 +38,7 @@ type test struct {
 }
 
 func runTests(t *testing.T, tests []test) {
+	t.Helper()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			rv := reflect.New(reflect.TypeOf(test.dest))

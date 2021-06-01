@@ -26,6 +26,13 @@ linters:
     - testpackage
     - godot
     - dogsled
+    - paralleltest
+    - gofumpt
+    - exhaustivestruct
+    - wrapcheck
+    - cyclop
+    - errorlint
+    - nlreturn
 
 linters-settings:
   govet:
@@ -37,6 +44,8 @@ linters-settings:
   goconst:
     min-len: 8
     min-occurrences: 3
+  exhaustive:
+    default-signifies-exhaustive: true
 
 issues:
   max-per-linter: 0
