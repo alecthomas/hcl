@@ -101,6 +101,37 @@ block "multiple" "labels" "varargs" {
 }
 `,
 		},
+		{name: "LongVarArgBlockLabels",
+			src: &struct {
+				Block varArgLabelBlock `hcl:"block,block"`
+			}{
+				Block: varArgLabelBlock{
+					Path: []string{"multiple", "labels", "varargs", "really", "really", "really", "really", "long", "labels", "that", "are", "really", "long"},
+				},
+			},
+			expected: `
+block "multiple" "labels" "varargs" "really" "really" "really" "really" "long"
+      "labels" "that" "are" "really" "long" {
+}
+`,
+		},
+		{name: "SingleReallyLongLabel",
+			src: &struct {
+				Block struct {
+					Label string `hcl:"label,label"`
+				} `hcl:"block,block"`
+			}{
+				Block: struct {
+					Label string `hcl:"label,label"`
+				}{
+					Label: "single label that is really really really really long with text that is really long",
+				},
+			},
+			expected: `
+block "single label that is really really really really long with text that is really long" {
+}
+`,
+		},
 		{name: "Heredocs",
 			src: &struct {
 				Nested struct {

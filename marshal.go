@@ -36,11 +36,14 @@ func InferHCLTags(v bool) MarshalOption {
 	}
 }
 
-// BareBooleanAttributes specifies whether attributes without values will be treated as boolean true values.
+// BareBooleanAttributes specifies whether attributes without values will be
+// treated as boolean true values.
 //
 // eg.
 //
 //     attr
+//
+// NOTE: This is non-standard HCL.
 func BareBooleanAttributes(v bool) MarshalOption {
 	return func(options *marshalState) {
 		options.bareAttr = true
@@ -580,14 +583,25 @@ func marshalMap(w io.Writer, indent string, entries []*MapEntry) error {
 
 func marshalBlock(w io.Writer, indent string, block *Block) error {
 	marshalComments(w, indent, block.Comments)
-	fmt.Fprintf(w, "%s%s ", indent, block.Name)
-	for _, label := range block.Labels {
-		fmt.Fprintf(w, "%q ", label)
+	prefix := fmt.Sprintf("%s%s", indent, block.Name)
+	fmt.Fprint(w, prefix)
+	labelIndent := len(prefix)
+	size := labelIndent
+	for i, label := range block.Labels {
+		text := strconv.Quote(label)
+		size += len(text)
+		if i > 0 && size+2 >= 80 {
+			size = labelIndent
+			fmt.Fprintf(w, "\n %s", strings.Repeat(" ", labelIndent))
+		} else {
+			fmt.Fprintf(w, " ")
+		}
+		fmt.Fprintf(w, "%s", text)
 	}
 	if block.Repeated {
-		fmt.Fprintln(w, "{ // (repeated)")
+		fmt.Fprintln(w, " { // (repeated)")
 	} else {
-		fmt.Fprintln(w, "{")
+		fmt.Fprintln(w, " {")
 	}
 	err := marshalEntries(w, indent+"  ", block.Body)
 	if err != nil {
