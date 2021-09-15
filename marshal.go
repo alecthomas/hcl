@@ -381,6 +381,11 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 }
 
 func valueToValue(v reflect.Value, opt *marshalState) (*Value, error) {
+	// Hydrate pointers
+	if v.Kind() == reflect.Ptr && v.IsNil() {
+		v.Set(reflect.New(v.Type().Elem()))
+		v = v.Elem()
+	}
 	// Special cased types.
 	t := v.Type()
 	if t == durationType {
