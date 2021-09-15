@@ -211,7 +211,7 @@ func fieldToAttr(field field, tag tag, schema bool, opt *marshalState) (*Attribu
 	var err error
 	if schema {
 		attr.Value, err = attrSchema(field.v.Type())
-	} else {
+	} else if !(field.v.Kind() == reflect.Ptr && field.v.IsNil()) {
 		attr.Value, err = valueToValue(field.v, opt)
 	}
 	if err != nil {
@@ -381,9 +381,7 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 }
 
 func valueToValue(v reflect.Value, opt *marshalState) (*Value, error) {
-	// Hydrate pointers
-	if v.Kind() == reflect.Ptr && v.IsNil() {
-		v.Set(reflect.New(v.Type().Elem()))
+	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
 	// Special cased types.
