@@ -485,8 +485,8 @@ type tag struct {
 	enum         string
 }
 
-func (t tag) comments() []string {
-	if t.help != "" {
+func (t tag) comments(opts *marshalState) []string {
+	if opts.schema && t.help != "" {
 		return strings.Split(t.help, "\n")
 	}
 	return nil

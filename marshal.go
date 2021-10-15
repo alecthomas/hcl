@@ -21,7 +21,15 @@ type marshalState struct {
 	inferHCLTags         bool
 	hereDocsForMultiline int
 	bareAttr             bool
+	schema               bool
 	seenStructs          map[reflect.Type]bool
+}
+
+// Create a shallow clone with schema overridden.
+func (m *marshalState) withSchema(schema bool) *marshalState {
+	out := *m
+	out.schema = schema
+	return &out
 }
 
 // MarshalOption configures optional marshalling behaviour.
@@ -58,6 +66,12 @@ func HereDocsForMultiLine(n int) MarshalOption {
 	}
 }
 
+func asSchema(schema bool) MarshalOption {
+	return func(options *marshalState) {
+		options.schema = schema
+	}
+}
+
 // newMarshalState creates marshal options from a set of options
 func newMarshalState(options ...MarshalOption) *marshalState {
 	opt := &marshalState{
@@ -80,7 +94,7 @@ func Marshal(v interface{}, options ...MarshalOption) ([]byte, error) {
 
 // MarshalToAST marshals a Go type to a hcl.AST.
 func MarshalToAST(v interface{}, options ...MarshalOption) (*AST, error) {
-	return marshalToAST(v, false, newMarshalState(options...))
+	return marshalToAST(v, newMarshalState(options...))
 }
 
 // MarshalAST marshals an AST to HCL bytes.
@@ -95,7 +109,7 @@ func MarshalASTToWriter(ast Node, w io.Writer) error {
 	return marshalNode(w, "", ast)
 }
 
-func marshalToAST(v interface{}, schema bool, opt *marshalState) (*AST, error) {
+func marshalToAST(v interface{}, opt *marshalState) (*AST, error) {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr {
 		return nil, fmt.Errorf("expected a pointer to a struct, not %T", v)
@@ -108,10 +122,10 @@ func marshalToAST(v interface{}, schema bool, opt *marshalState) (*AST, error) {
 		err    error
 		labels []string
 		ast    = &AST{
-			Schema: schema,
+			Schema: opt.schema,
 		}
 	)
-	ast.Entries, labels, err = structToEntries(rv, schema, opt)
+	ast.Entries, labels, err = structToEntries(rv, opt)
 	if err != nil {
 		return nil, err
 	}
@@ -121,10 +135,10 @@ func marshalToAST(v interface{}, schema bool, opt *marshalState) (*AST, error) {
 	return ast, nil
 }
 
-func structToEntries(v reflect.Value, schema bool, opt *marshalState) (entries []*Entry, labels []string, err error) {
+func structToEntries(v reflect.Value, opt *marshalState) (entries []*Entry, labels []string, err error) {
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
-			if !schema {
+			if !opt.schema {
 				return nil, nil, nil
 			}
 			v = reflect.New(v.Type().Elem())
@@ -133,7 +147,7 @@ func structToEntries(v reflect.Value, schema bool, opt *marshalState) (entries [
 	}
 
 	// Check for recursive structures.
-	if schema && opt.seenStructs[v.Type()] {
+	if opt.schema && opt.seenStructs[v.Type()] {
 		return []*Entry{
 			{RecursiveSchema: true},
 		}, nil, nil
@@ -150,7 +164,7 @@ func structToEntries(v reflect.Value, schema bool, opt *marshalState) (entries [
 		switch {
 		case tag.name == "": // Skip
 		case tag.label:
-			if schema {
+			if opt.schema {
 				labels = append(labels, tag.name)
 			} else {
 				if field.v.Kind() == reflect.String {
@@ -163,7 +177,7 @@ func structToEntries(v reflect.Value, schema bool, opt *marshalState) (entries [
 		case tag.block:
 			if field.v.Kind() == reflect.Slice {
 				var blocks []*Block
-				if schema {
+				if opt.schema {
 					block, err := sliceToBlockSchema(field.v.Type(), tag, opt)
 					if err == nil {
 						block.Repeated = true
@@ -179,7 +193,7 @@ func structToEntries(v reflect.Value, schema bool, opt *marshalState) (entries [
 					entries = append(entries, &Entry{Block: block})
 				}
 			} else {
-				block, err := valueToBlock(field.v, tag, schema, opt)
+				block, err := valueToBlock(field.v, tag, opt)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -187,14 +201,14 @@ func structToEntries(v reflect.Value, schema bool, opt *marshalState) (entries [
 			}
 
 		default:
-			attr, err := fieldToAttr(field, tag, schema, opt)
+			attr, err := fieldToAttr(field, tag, opt)
 			if err != nil {
 				return nil, nil, err
 			}
 			hasDefaultAndEqualsValue := attr.Default != nil && attr.Value.String() == attr.Default.String()
 			noDefaultButIsZero := attr.Default == nil && field.v.IsZero()
 			valueEqualsDefault := noDefaultButIsZero || hasDefaultAndEqualsValue
-			if tag.optional && !schema && valueEqualsDefault {
+			if tag.optional && !opt.schema && valueEqualsDefault {
 				continue
 			}
 			entries = append(entries, &Entry{Attribute: attr})
@@ -203,13 +217,13 @@ func structToEntries(v reflect.Value, schema bool, opt *marshalState) (entries [
 	return entries, labels, nil
 }
 
-func fieldToAttr(field field, tag tag, schema bool, opt *marshalState) (*Attribute, error) {
+func fieldToAttr(field field, tag tag, opt *marshalState) (*Attribute, error) {
 	attr := &Attribute{
 		Key:      tag.name,
-		Comments: tag.comments(),
+		Comments: tag.comments(opt),
 	}
 	var err error
-	if schema {
+	if opt.schema {
 		attr.Value, err = attrSchema(field.v.Type())
 	} else if !(field.v.Kind() == reflect.Ptr && field.v.IsNil()) {
 		attr.Value, err = valueToValue(field.v, opt)
@@ -221,7 +235,7 @@ func fieldToAttr(field field, tag tag, schema bool, opt *marshalState) (*Attribu
 	if err != nil {
 		return nil, err
 	}
-	attr.Optional = (tag.optional || attr.Default != nil) && schema
+	attr.Optional = (tag.optional || attr.Default != nil) && opt.schema
 	attr.Enum, err = enumValuesFromTag(field, tag.enum)
 	return attr, err
 }
@@ -474,20 +488,20 @@ func valueToValue(v reflect.Value, opt *marshalState) (*Value, error) {
 	}
 }
 
-func valueToBlock(v reflect.Value, tag tag, schema bool, opt *marshalState) (*Block, error) {
+func valueToBlock(v reflect.Value, tag tag, opt *marshalState) (*Block, error) {
 	block := &Block{
 		Name:     tag.name,
-		Comments: tag.comments(),
+		Comments: tag.comments(opt),
 	}
 	var err error
-	block.Body, block.Labels, err = structToEntries(v, schema, opt)
+	block.Body, block.Labels, err = structToEntries(v, opt)
 	return block, err
 }
 
 func sliceToBlocks(sv reflect.Value, tag tag, opt *marshalState) ([]*Block, error) {
 	blocks := []*Block{}
 	for i := 0; i != sv.Len(); i++ {
-		block, err := valueToBlock(sv.Index(i), tag, false, opt)
+		block, err := valueToBlock(sv.Index(i), tag, opt.withSchema(false))
 		if err != nil {
 			return nil, err
 		}

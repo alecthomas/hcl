@@ -9,7 +9,8 @@ import (
 //
 // A schema is itself HCL.
 func Schema(v interface{}, options ...MarshalOption) (*AST, error) {
-	ast, err := marshalToAST(v, true, newMarshalState(options...))
+	options = append(options, asSchema(true))
+	ast, err := marshalToAST(v, newMarshalState(options...))
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +32,8 @@ func BlockSchema(name string, v interface{}, options ...MarshalOption) (*AST, er
 	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Struct {
 		return nil, fmt.Errorf("expected a pointer to a struct not %T", v)
 	}
-	block, err := valueToBlock(rv.Elem(), tag{name: name, block: true}, true, newMarshalState(options...))
+	options = append(options, asSchema(true))
+	block, err := valueToBlock(rv.Elem(), tag{name: name, block: true}, newMarshalState(options...))
 	if err != nil {
 		return nil, err
 	}
@@ -100,10 +102,10 @@ func attrSchema(t reflect.Type) (*Value, error) {
 func sliceToBlockSchema(t reflect.Type, tag tag, opt *marshalState) (*Block, error) {
 	block := &Block{
 		Name:     tag.name,
-		Comments: tag.comments(),
+		Comments: tag.comments(opt),
 		Repeated: true,
 	}
 	var err error
-	block.Body, block.Labels, err = structToEntries(reflect.New(t.Elem()).Elem(), true, opt)
+	block.Body, block.Labels, err = structToEntries(reflect.New(t.Elem()).Elem(), opt.withSchema(true))
 	return block, err
 }

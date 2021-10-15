@@ -307,6 +307,16 @@ block {
 `,
 			options: []MarshalOption{InferHCLTags(true)},
 		},
+		{name: "DontMarshalHelpTag",
+			src: &struct {
+				Attr string `hcl:"attr" help:"An attribute."`
+			}{
+				Attr: "string",
+			},
+			expected: `
+attr = "string"
+			`,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
