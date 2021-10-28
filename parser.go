@@ -349,7 +349,7 @@ var (
 	lex = lexer.Must(stateful.New(stateful.Rules{
 		"Root": {
 			{"Ident", `\b[[:alpha:]]\w*(-\w+)*\b`, nil},
-			{"Number", `\b^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?\b`, nil},
+			{"Number", `^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?`, nil},
 			{"Heredoc", `<<[-]?(\w+\b)`, stateful.Push("Heredoc")},
 			{"String", `"(\\\d\d\d|\\.|[^"])*"|'(\\\d\d\d|\\.|[^'])*'`, nil},
 			{"Punct", `[][{}=:,]`, nil},
