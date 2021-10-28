@@ -93,7 +93,10 @@ EOF
 				true_bool = true
 				false_bool = false
 				str = "string"
+				int = 1
+				negative_int = -1
 				float = 1.234
+				negative_float = -1.234
 				list = [1, 2, 3]
 				map = {
 					"a": 1,
@@ -105,7 +108,10 @@ EOF
 					attr("true_bool", hbool(true)),
 					attr("false_bool", hbool(false)),
 					attr("str", str("string")),
+					attr("int", num(1)),
+					attr("negative_int", num(-1)),
 					attr("float", num(1.234)),
+					attr("negative_float", num(-1.234)),
 					attr("list", list(num(1), num(2), num(3))),
 					attr("map", hmap(
 						hkv("a", num(1)),
