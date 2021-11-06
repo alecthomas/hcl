@@ -28,6 +28,13 @@ func (n *numberTest) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+type customLabelType string
+
+func (c *customLabelType) UnmarshalText(text []byte) error {
+	*c = customLabelType(text) + "-custom"
+	return nil
+}
+
 type test struct {
 	name    string
 	hcl     string
@@ -338,6 +345,22 @@ func TestUnmarshal(t *testing.T) {
 			}{
 				Block: []*strBlock{{Str: "foo"}, {Str: "bar"}},
 			},
+		},
+		{
+			name: "UnmarshalTextMarshallerLabel",
+			hcl:  `block label {}`,
+			dest: struct {
+				Block struct {
+					Label customLabelType `hcl:"label,label"`
+				} `hcl:"block,block"`
+			}{
+				Block: struct {
+					Label customLabelType `hcl:"label,label"`
+				}{Label: "label-custom"},
+			},
+			fail:    "",
+			fixup:   nil,
+			options: nil,
 		},
 		{name: "Remain",
 			hcl: `

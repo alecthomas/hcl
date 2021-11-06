@@ -316,7 +316,14 @@ func unmarshalBlock(v reflect.Value, block *Block, opt *marshalState) error {
 		if len(labels) == 0 {
 			return participle.Errorf(block.Pos, "missing label %q", tag.name)
 		}
-		if field.v.Kind() == reflect.String {
+		if uv, ok := implements(field.v, textUnmarshalerInterface); ok {
+			label := labels[0]
+			labels = labels[1:]
+			err := uv.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(label))
+			if err != nil {
+				return participle.Wrapf(block.Pos, err, "invalid label %q", tag.name)
+			}
+		} else if field.v.Kind() == reflect.String {
 			label := labels[0]
 			labels = labels[1:]
 			field.v.SetString(label)
