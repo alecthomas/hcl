@@ -164,6 +164,9 @@ EOF
 				attr
 				`,
 			expected: hcl(attr("attr", nil))},
+		{name: "Zero",
+			hcl:      `num = 0`,
+			expected: hcl(attr("num", num(0)))},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

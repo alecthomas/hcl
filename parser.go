@@ -217,6 +217,8 @@ type Bool bool
 
 func (b *Bool) Capture(values []string) error { *b = values[0] == "true"; return nil } // nolint: golint
 
+var needsOctalPrefix = regexp.MustCompile(`^0\d+$`)
+
 // Number of arbitrary precision.
 type Number struct{ *big.Float }
 
@@ -225,7 +227,7 @@ func (n *Number) GoString() string { return n.String() }
 // Capture override because big.Float doesn't directly support 0-prefix octal parsing... why?
 func (n *Number) Capture(values []string) error {
 	value := values[0]
-	if strings.HasPrefix(value, "0") {
+	if needsOctalPrefix.MatchString(value) {
 		value = "0o" + value[1:]
 	}
 	n.Float = big.NewFloat(0)
