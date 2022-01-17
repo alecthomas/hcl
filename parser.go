@@ -148,7 +148,7 @@ type Block struct {
 	Comments []string `parser:"@Comment*" json:"comments,omitempty"`
 
 	Name   string   `parser:"@Ident" json:"name"`
-	Labels []string `parser:"@( Ident | String )*" json:"labels,omitempty"`
+	Labels []string `parser:"@( Ident | (StringStart ~StringEnd* StringEnd) )*" json:"labels,omitempty"`
 	Body   []*Entry `parser:"'{' @@*" json:"body"`
 
 	TrailingComments []string `parser:"@Comment* '}'" json:"trailing_comments,omitempty"`
@@ -243,7 +243,7 @@ type Value struct {
 	Bool             *Bool       `parser:"(  @('true' | 'false')" json:"bool,omitempty"`
 	Number           *Number     `parser:" | @Number" json:"number,omitempty"`
 	Type             *string     `parser:" | @('number':Ident | 'string':Ident | 'boolean':Ident)" json:"type,omitempty"`
-	Str              *string     `parser:" | @(String | Ident)" json:"str,omitempty"`
+	Str              *string     `parser:" | @((StringStart ~StringEnd* StringEnd) | Ident)" json:"str,omitempty"`
 	HeredocDelimiter string      `parser:" | (@Heredoc" json:"heredoc_delimiter,omitempty"`
 	Heredoc          *string     `parser:"     @(Body | EOL)* End)" json:"heredoc,omitempty"`
 	HaveList         bool        `parser:" | ( @'['" json:"have_list,omitempty"` // Need this to detect empty lists.
@@ -353,10 +353,25 @@ var (
 			{"Ident", `\b[[:alpha:]]\w*(-\w+)*\b`, nil},
 			{"Number", `^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?`, nil},
 			{"Heredoc", `<<[-]?(\w+\b)`, stateful.Push("Heredoc")},
-			{"String", `"(\\\d\d\d|\\.|[^"])*"|'(\\\d\d\d|\\.|[^'])*'`, nil},
-			{"Punct", `[][{}=:,]`, nil},
+			//{"String", `"(\\\d\d\d|\\.|[^"])*"|'(\\\d\d\d|\\.|[^'])*'`, nil},
+			{"StringStart", `"`, stateful.Push("String")},
 			{"Comment", `(?:(?://|#)[^\n]*)|/\*.*?\*/`, nil},
+			{"Punct", `[][{}=:,()*/+=?%^&|!-]`, nil},
 			{"whitespace", `\s+`, nil},
+		},
+		"String": {
+			{"Escaped", `\\\d\d\d|\\.`, nil},
+			{"StringEnd", `"`, stateful.Pop()},
+			{"EscapedExpr", `(\$\$|%%)`, nil},
+			{"Expr", `(\${|%{)`, stateful.Push("Expr")},
+			{"Char", `[^$%"\\]+`, nil},
+		},
+		"Expr": {
+			stateful.Include("Root"),
+			{`whitespace`, `\s+`, nil},
+			{`Oper`, `[-+/*%]`, nil},
+			{"Ident", `\b[[:alpha:]]\w*(-\w+)*\b`, nil},
+			{"ExprEnd", `}`, stateful.Pop()},
 		},
 		"Heredoc": {
 			{"End", `\n\s*\b\1\b`, stateful.Pop()},
@@ -366,7 +381,7 @@ var (
 	}))
 	parser = participle.MustBuild(&AST{},
 		participle.Lexer(lex),
-		participle.Unquote("String"),
+		//participle.Unquote("String"),
 		participle.Map(cleanHeredocStart, "Heredoc"),
 		participle.Map(stripComment, "Comment"),
 		// We need lookahead to ensure prefixed comments are associated with the right nodes.

@@ -195,6 +195,15 @@ func TestHeredocIndented(t *testing.T) {
 	require.Equal(t, expected, hcl.Entries[0].Attribute.Value.GetHeredoc())
 }
 
+func TestTemplateInterpolation(t *testing.T) {
+	hcl, err := ParseString(`
+key = "${hashFiles("go.sum")}"
+`)
+	require.NoError(t, err)
+	expected := "???"
+	require.Equal(t, expected, hcl.Entries[0].Attribute.Value.GetHeredoc())
+}
+
 func heredoc(delim, s string) *Value {
 	return &Value{HeredocDelimiter: delim, Heredoc: &s}
 }
