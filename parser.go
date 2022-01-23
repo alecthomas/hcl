@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/big"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/alecthomas/participle"
@@ -366,7 +367,7 @@ var (
 	}))
 	parser = participle.MustBuild(&AST{},
 		participle.Lexer(lex),
-		participle.Unquote("String"),
+		participle.Map(unquoteString, "String"),
 		participle.Map(cleanHeredocStart, "Heredoc"),
 		participle.Map(stripComment, "Comment"),
 		// We need lookahead to ensure prefixed comments are associated with the right nodes.
@@ -377,6 +378,18 @@ var stripCommentRe = regexp.MustCompile(`^//\s*|^/\*|\*/$`)
 
 func stripComment(token lexer.Token) (lexer.Token, error) {
 	token.Value = stripCommentRe.ReplaceAllString(token.Value, "")
+	return token, nil
+}
+
+func unquoteString(token lexer.Token) (lexer.Token, error) {
+	if token.Value[0] == '\'' {
+		token.Value = "\"" + strings.ReplaceAll(token.Value[1:len(token.Value)-1], "\"", "\\\"") + "\""
+	}
+	var err error
+	token.Value, err = strconv.Unquote(token.Value)
+	if err != nil {
+		return token, fmt.Errorf("%s: %w", token.Pos, err)
+	}
 	return token, nil
 }
 
