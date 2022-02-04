@@ -22,6 +22,7 @@ type marshalState struct {
 	hereDocsForMultiline int
 	bareAttr             bool
 	schema               bool
+	schemaComments       bool
 	seenStructs          map[reflect.Type]bool
 }
 
@@ -63,6 +64,14 @@ func BareBooleanAttributes(v bool) MarshalOption {
 func HereDocsForMultiLine(n int) MarshalOption {
 	return func(options *marshalState) {
 		options.hereDocsForMultiline = n
+	}
+}
+
+// WithSchemaComments will export the contents of the help struct tag
+// as comments when marshaling.
+func WithSchemaComments(v bool) MarshalOption {
+	return func(options *marshalState) {
+		options.schemaComments = v
 	}
 }
 

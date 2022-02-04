@@ -317,6 +317,17 @@ block {
 attr = "string"
 			`,
 		},
+		{name: "MarshalHelpTagIfWithSchemaComments",
+			src: &struct {
+				Attr string `hcl:"attr" help:"An attribute."`
+			}{
+				Attr: "string",
+			},
+			expected: `// An attribute.
+attr = "string"
+			`,
+			options: []MarshalOption{WithSchemaComments(true)},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
