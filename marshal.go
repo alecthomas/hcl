@@ -22,12 +22,12 @@ type marshalState struct {
 	hereDocsForMultiline int
 	bareAttr             bool
 	schema               bool
+	schemaComments       bool
 	seenStructs          map[reflect.Type]bool
 }
 
-// Create a shallow clone with schema overridden. 
-// This will cause the contents of help struct tag to be exported as comments.
-func (m *marshalState) WithSchema(schema bool) *marshalState {
+// Create a shallow clone with schema overridden.
+func (m *marshalState) withSchema(schema bool) *marshalState {
 	out := *m
 	out.schema = schema
 	return &out
@@ -64,6 +64,14 @@ func BareBooleanAttributes(v bool) MarshalOption {
 func HereDocsForMultiLine(n int) MarshalOption {
 	return func(options *marshalState) {
 		options.hereDocsForMultiline = n
+	}
+}
+
+// WithSchemaComments will export the contents of the help struct tag
+// as comments when marshaling.
+func WithSchemaComments(v bool) MarshalOption {
+	return func(options *marshalState) {
+		options.schemaComments = v
 	}
 }
 

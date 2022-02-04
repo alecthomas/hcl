@@ -493,7 +493,7 @@ type tag struct {
 }
 
 func (t tag) comments(opts *marshalState) []string {
-	if opts.schema && t.help != "" {
+	if (opts.schemaComments || opts.schema) && t.help != "" {
 		return strings.Split(t.help, "\n")
 	}
 	return nil
