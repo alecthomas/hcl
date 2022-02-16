@@ -36,8 +36,11 @@ func Unmarshal(data []byte, v interface{}, options ...MarshalOption) error {
 // UnmarshalAST unmarshalls an already parsed or constructed AST into a Go struct.
 func UnmarshalAST(ast *AST, v interface{}, options ...MarshalOption) error {
 	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Ptr {
-		return fmt.Errorf("%T must be a pointer", v)
+	if rv.Kind() == reflect.Ptr && rv.IsNil() {
+		return fmt.Errorf("can't unmarshal into nil")
+	}
+	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Struct {
+		return fmt.Errorf("can only unmarshal into a pointer to a struct, not %s", rv.Type())
 	}
 	opt := &marshalState{}
 	for _, option := range options {
@@ -49,6 +52,12 @@ func UnmarshalAST(ast *AST, v interface{}, options ...MarshalOption) error {
 // UnmarshalBlock into a struct.
 func UnmarshalBlock(block *Block, v interface{}, options ...MarshalOption) error {
 	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Ptr && rv.IsNil() {
+		return fmt.Errorf("can't unmarshal into nil")
+	}
+	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Struct {
+		return fmt.Errorf("can only unmarshal into a pointer to a struct, not %s", rv)
+	}
 	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("%T must be a pointer to a struct", v)
 	}
@@ -62,7 +71,7 @@ func UnmarshalBlock(block *Block, v interface{}, options ...MarshalOption) error
 
 func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) error {
 	if v.Kind() != reflect.Struct {
-		return fmt.Errorf("%T must be a struct", v.Interface())
+		return fmt.Errorf("%s must be a struct", v.Type())
 	}
 	// Collect entries from the source into a map.
 	seen := map[string]*Entry{}
