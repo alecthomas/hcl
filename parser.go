@@ -69,6 +69,27 @@ type Entry struct {
 	Attribute *Attribute `parser:"  | @@ )" json:"attribute,omitempty"`
 }
 
+// Detach Entry from parent.
+func (e *Entry) Detach() bool {
+	var entries *[]*Entry
+	switch node := e.Parent.(type) {
+	case *Block:
+		entries = &node.Body
+	case *AST:
+		entries = &node.Entries
+	}
+	if entries == nil {
+		return false
+	}
+	for i, entry := range *entries {
+		if entry == e {
+			*entries = append((*entries)[:i], (*entries)[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
 func (e *Entry) children() (children []Node) {
 	return []Node{e.Attribute, e.Block}
 }
@@ -156,6 +177,16 @@ type Block struct {
 
 	// The block can be repeated. This is surfaced in schemas.
 	Repeated bool `parser:"" json:"repeated,omitempty"`
+}
+
+// Detach Block from parent.
+//
+// Returns true if successful.
+func (b *Block) Detach() bool {
+	if b.Parent == nil {
+		return false
+	}
+	return b.Parent.(*Entry).Detach()
 }
 
 func (b *Block) children() (children []Node) {

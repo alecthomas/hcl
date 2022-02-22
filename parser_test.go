@@ -11,6 +11,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestDetach(t *testing.T) {
+	ast, err := ParseString(`
+		one {}
+		two {}
+		three {}
+	`)
+	require.NoError(t, err)
+	ok := ast.Entries[1].Block.Detach()
+	require.True(t, ok)
+
+	actual, err := MarshalAST(ast)
+	require.NoError(t, err)
+	require.Equal(t, `one {
+}
+
+three {
+}
+`, string(actual))
+}
+
 func TestGetHeredoc(t *testing.T) {
 	value := &Value{
 		HeredocDelimiter: "-EOF",
