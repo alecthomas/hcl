@@ -24,6 +24,7 @@ type marshalState struct {
 	schema               bool
 	schemaComments       bool
 	seenStructs          map[reflect.Type]bool
+	allowExtra           bool
 }
 
 // Create a shallow clone with schema overridden.
@@ -64,6 +65,13 @@ func BareBooleanAttributes(v bool) MarshalOption {
 func HereDocsForMultiLine(n int) MarshalOption {
 	return func(options *marshalState) {
 		options.hereDocsForMultiline = n
+	}
+}
+
+// AllowExtra fields in configuration to be skipped.
+func AllowExtra(ok bool) MarshalOption {
+	return func(options *marshalState) {
+		options.allowExtra = true
 	}
 }
 

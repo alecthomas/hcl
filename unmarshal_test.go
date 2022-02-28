@@ -638,6 +638,14 @@ name = "a"
 `
 	tests := []test{
 		{
+			name: "AllowExtra",
+			hcl:  `foo = 10`,
+			dest: struct {
+				Bar string `hcl:"bar,optional"`
+			}{},
+			options: []MarshalOption{AllowExtra(true)},
+		},
+		{
 			name: "WrongInt",
 			hcl:  hcl,
 			dest: struct {

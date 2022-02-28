@@ -264,8 +264,8 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 		}
 	}
 
-	if len(seen) > 0 {
-		need := []string{}
+	if !opt.allowExtra && len(seen) > 0 {
+		need := make([]string, 0, len(seen))
 		var pos *lexer.Position
 		for key, entry := range seen {
 			if pos == nil {
