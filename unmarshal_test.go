@@ -309,6 +309,13 @@ func TestUnmarshal(t *testing.T) {
 				Ptr *string `hcl:"ptr"`
 			}{Ptr: strp("one")},
 		},
+		{name: "PointerScalarsNil",
+			hcl: `
+			`,
+			dest: struct {
+				Ptr *string `hcl:"ptr,optional"`
+			}{Ptr: nil},
+		},
 		{name: "PointerList",
 			hcl: `
 				list = [1, 2]

@@ -234,7 +234,7 @@ block {
 			options: []MarshalOption{InferHCLTags(true)},
 		},
 		{
-			name: "default values",
+			name: "DefaultValues",
 			src: &struct {
 				Str string `hcl:"strVal" default:"str"`
 				// where default is not empty value anymore
@@ -362,4 +362,17 @@ default_val = "2"
 	require.NoError(t, err)
 	require.Equal(t, strings.TrimSpace(hcl), strings.TrimSpace(string(marshalled)))
 
+}
+
+func TestOptionalDefaultOmitted(t *testing.T) {
+	type Embedded struct {
+		Inner *string `hcl:"inner,optional" default:"inner"`
+	}
+	type Root struct {
+		Outer string `hcl:"outer,optional"`
+		Embedded
+	}
+	data, err := Marshal(&Root{})
+	require.NoError(t, err)
+	require.Equal(t, "", string(data))
 }

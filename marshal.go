@@ -222,11 +222,15 @@ func structToEntries(v reflect.Value, opt *marshalState) (entries []*Entry, labe
 			if err != nil {
 				return nil, nil, err
 			}
-			hasDefaultAndEqualsValue := attr.Default != nil && attr.Value.String() == attr.Default.String()
+			hasDefaultAndEqualsValue := attr.Default != nil && attr.Value != nil && attr.Value.String() == attr.Default.String()
 			noDefaultButIsZero := attr.Default == nil && field.v.IsZero()
 			valueEqualsDefault := noDefaultButIsZero || hasDefaultAndEqualsValue
-			if tag.optional && !opt.schema && valueEqualsDefault {
-				continue
+			if tag.optional {
+				if attr.Value == nil || (!opt.schema && valueEqualsDefault) {
+					continue
+				}
+			} else if attr.Value == nil {
+				return nil, nil, fmt.Errorf("required value cannot be nil")
 			}
 			entries = append(entries, &Entry{Attribute: attr})
 		}
@@ -262,7 +266,6 @@ func defaultValueFromTag(f field, defaultValue string) (*Value, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error parsing default value: %v", err)
 	}
-
 	return v, nil
 }
 
@@ -294,7 +297,7 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 
 	k := f.v.Kind()
 	if k == reflect.Ptr {
-		k = f.v.Elem().Kind()
+		k = f.v.Type().Elem().Kind()
 	}
 
 	switch k {
@@ -407,7 +410,7 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 			List:     slice,
 		}, nil
 	default:
-		return nil, fmt.Errorf("only primitive types, map & slices can have tag value, not %q", f.v.Kind())
+		return nil, fmt.Errorf("only primitive types, map & slices can have tag value, not %q", f.v.Type())
 	}
 }
 
