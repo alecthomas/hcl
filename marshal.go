@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alecthomas/participle/lexer"
+	"github.com/alecthomas/participle/v2/lexer"
 )
 
 // marshalState defines options and state for the marshalling/unmarshalling process
@@ -292,7 +292,7 @@ func enumValuesFromTag(f field, enum string) ([]*Value, error) {
 
 func valueFromTag(f field, defaultValue string) (*Value, error) {
 	if defaultValue == "" {
-		return nil, nil
+		return nil, nil // nolint: nilnil
 	}
 
 	k := f.v.Kind()

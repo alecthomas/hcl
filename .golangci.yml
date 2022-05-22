@@ -34,6 +34,12 @@ linters:
     - errorlint
     - nlreturn
     - gocritic
+    - nonamedreturns
+    - varnamelen
+    - exhaustruct
+    - forcetypeassert
+    - maintidx
+    - revive
 
 linters-settings:
   govet:

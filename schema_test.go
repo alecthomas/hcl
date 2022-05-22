@@ -104,7 +104,7 @@ const expectedJSONSchema = `
       "attribute": {
         "key": "list",
         "value": {
-          "have_list": true,
+          "haveList": true,
           "list": [
             {
               "type": "string"
@@ -120,7 +120,7 @@ const expectedJSONSchema = `
         ],
         "key": "map",
         "value": {
-          "have_map": true,
+          "haveMap": true,
           "map": [
             {
               "key": {

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/alecthomas/hcl"
-	"github.com/alecthomas/participle"
+	"github.com/alecthomas/participle/v2"
 	"github.com/hashicorp/hil"
 	hilast "github.com/hashicorp/hil/ast"
 )

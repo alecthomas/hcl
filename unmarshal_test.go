@@ -765,8 +765,8 @@ func TestEnumInvalidCases(t *testing.T) {
 		{
 			name: "StringMismatch",
 			hcl: `
-name = "test"
-`,
+		name = "test"
+		`,
 			dest: struct {
 				Name string `hcl:"name" enum:"a,b,c"`
 			}{
@@ -777,8 +777,8 @@ name = "test"
 		{
 			name: "FloatMismatch",
 			hcl: `
-val = 2.33
-`,
+		val = 2.33
+		`,
 			dest: struct {
 				Val float64 `hcl:"val" enum:"2.11,2.21,5.22"`
 			}{
@@ -789,8 +789,8 @@ val = 2.33
 		{
 			name: "IntMismatch",
 			hcl: `
-val = 17
-`,
+		val = 17
+		`,
 			dest: struct {
 				Val int32 `hcl:"val" enum:"10,25,100"`
 			}{
@@ -800,8 +800,7 @@ val = 17
 		},
 		{
 			name: "StringDefaultValueConflicts",
-			hcl: `
-`,
+			hcl:  ``,
 			dest: struct {
 				Str string `hcl:"str" enum:"a,b,c" default:"d"`
 			}{

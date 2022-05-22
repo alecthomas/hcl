@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alecthomas/participle"
-	"github.com/alecthomas/participle/lexer"
+	"github.com/alecthomas/participle/v2"
+	"github.com/alecthomas/participle/v2/lexer"
 )
 
 var (
@@ -278,7 +278,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 	return nil
 }
 
-func checkEnum(v *Value, f field, enum string) error { // nolint: interfacer
+func checkEnum(v *Value, f field, enum string) error {
 	if enum == "" || v == nil {
 		return nil
 	}

@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/alecthomas/participle/lexer"
+	"github.com/alecthomas/participle/v2/lexer"
 	"github.com/alecthomas/repr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

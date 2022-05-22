@@ -11,9 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alecthomas/participle"
-	"github.com/alecthomas/participle/lexer"
-	"github.com/alecthomas/participle/lexer/stateful"
+	"github.com/alecthomas/participle/v2"
+	"github.com/alecthomas/participle/v2/lexer"
 	"github.com/alecthomas/repr"
 )
 
@@ -30,7 +29,7 @@ type AST struct {
 	Pos lexer.Position `parser:"" json:"-"`
 
 	Entries          []*Entry `parser:"@@*" json:"entries,omitempty"`
-	TrailingComments []string `parser:"@Comment*" json:"trailing_comments,omitempty"`
+	TrailingComments []string `parser:"@Comment*" json:"trailingComments,omitempty"`
 	Schema           bool     `parser:"" json:"schema,omitempty"`
 }
 
@@ -173,7 +172,7 @@ type Block struct {
 	Labels []string `parser:"@( Ident | String )*" json:"labels,omitempty"`
 	Body   []*Entry `parser:"'{' @@*" json:"body"`
 
-	TrailingComments []string `parser:"@Comment* '}'" json:"trailing_comments,omitempty"`
+	TrailingComments []string `parser:"@Comment* '}'" json:"trailingComments,omitempty"`
 
 	// The block can be repeated. This is surfaced in schemas.
 	Repeated bool `parser:"" json:"repeated,omitempty"`
@@ -276,11 +275,11 @@ type Value struct {
 	Number           *Number     `parser:" | @Number" json:"number,omitempty"`
 	Type             *string     `parser:" | @('number':Ident | 'string':Ident | 'boolean':Ident)" json:"type,omitempty"`
 	Str              *string     `parser:" | @(String | Ident)" json:"str,omitempty"`
-	HeredocDelimiter string      `parser:" | (@Heredoc" json:"heredoc_delimiter,omitempty"`
+	HeredocDelimiter string      `parser:" | (@Heredoc" json:"heredocDelimiter,omitempty"`
 	Heredoc          *string     `parser:"     @(Body | EOL)* End)" json:"heredoc,omitempty"`
-	HaveList         bool        `parser:" | ( @'['" json:"have_list,omitempty"` // Need this to detect empty lists.
+	HaveList         bool        `parser:" | ( @'['" json:"haveList,omitempty"` // Need this to detect empty lists.
 	List             []*Value    `parser:"     ( @@ ( ',' @@ )* )? ','? ']' )" json:"list,omitempty"`
-	HaveMap          bool        `parser:" | ( @'{'" json:"have_map,omitempty"` // Need this to detect empty maps.
+	HaveMap          bool        `parser:" | ( @'{'" json:"haveMap,omitempty"` // Need this to detect empty maps.
 	Map              []*MapEntry `parser:"     ( @@ ( ',' @@ )* ','? )? '}' ) )" json:"map,omitempty"`
 }
 
@@ -380,18 +379,18 @@ func (v *Value) GetHeredoc() string {
 }
 
 var (
-	lex = lexer.Must(stateful.New(stateful.Rules{
+	lex = lexer.Must(lexer.New(lexer.Rules{
 		"Root": {
 			{"Ident", `\b[[:alpha:]]\w*(-\w+)*\b`, nil},
 			{"Number", `^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?`, nil},
-			{"Heredoc", `<<[-]?(\w+\b)`, stateful.Push("Heredoc")},
+			{"Heredoc", `<<[-]?(\w+\b)`, lexer.Push("Heredoc")},
 			{"String", `"(\\\d\d\d|\\.|[^"])*"|'(\\\d\d\d|\\.|[^'])*'`, nil},
 			{"Punct", `[][{}=:,]`, nil},
 			{"Comment", `(?:(?://|#)[^\n]*)|/\*.*?\*/`, nil},
-			{"whitespace", `\s+`, nil},
+			{"Whitespace", `\s+`, nil},
 		},
 		"Heredoc": {
-			{"End", `\n\s*\b\1\b`, stateful.Pop()},
+			{"End", `\n\s*\b\1\b`, lexer.Pop()},
 			{"EOL", `\n`, nil},
 			{"Body", `[^\n]+`, nil},
 		},
@@ -401,6 +400,7 @@ var (
 		participle.Map(unquoteString, "String"),
 		participle.Map(cleanHeredocStart, "Heredoc"),
 		participle.Map(stripComment, "Comment"),
+		participle.Elide("Whitespace"),
 		// We need lookahead to ensure prefixed comments are associated with the right nodes.
 		participle.UseLookahead(50))
 )
@@ -433,7 +433,7 @@ func cleanHeredocStart(token lexer.Token) (lexer.Token, error) {
 // Parse HCL from an io.Reader.
 func Parse(r io.Reader) (*AST, error) {
 	hcl := &AST{}
-	err := parser.Parse(r, hcl)
+	err := parser.Parse("", r, hcl)
 	if err != nil {
 		return nil, err
 	}
@@ -443,7 +443,7 @@ func Parse(r io.Reader) (*AST, error) {
 // ParseString parses HCL from a string.
 func ParseString(str string) (*AST, error) {
 	hcl := &AST{}
-	err := parser.ParseString(str, hcl)
+	err := parser.ParseString("", str, hcl)
 	if err != nil {
 		return nil, err
 	}
@@ -453,7 +453,7 @@ func ParseString(str string) (*AST, error) {
 // ParseBytes parses HCL from bytes.
 func ParseBytes(data []byte) (*AST, error) {
 	hcl := &AST{}
-	err := parser.ParseBytes(data, hcl)
+	err := parser.ParseBytes("", data, hcl)
 	if err != nil {
 		return nil, err
 	}
