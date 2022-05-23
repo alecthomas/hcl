@@ -1,9 +1,10 @@
 package hcl
 
 import (
+	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	require "github.com/alecthomas/assert/v2"
 )
 
 func TestFind(t *testing.T) {
@@ -18,12 +19,12 @@ func TestFind(t *testing.T) {
 	require.NoError(t, err)
 
 	nodes := Find(ast, "attr")
-	require.Len(t, nodes, 1)
-	require.IsType(t, &Attribute{}, nodes[0])
+	require.Equal(t, len(nodes), 1)
+	require.Equal(t, reflect.TypeOf(&Attribute{}), reflect.TypeOf(nodes[0]))
 
 	nodes = Find(ast, "attr", "key", "block")
-	require.Len(t, nodes, 3)
-	require.IsType(t, &Attribute{}, nodes[0])
-	require.IsType(t, &Block{}, nodes[1])
-	require.IsType(t, &MapEntry{}, nodes[2])
+	require.Equal(t, len(nodes), 3)
+	require.Equal(t, reflect.TypeOf(&Attribute{}), reflect.TypeOf(nodes[0]))
+	require.Equal(t, reflect.TypeOf(&Block{}), reflect.TypeOf(nodes[1]))
+	require.Equal(t, reflect.TypeOf(&MapEntry{}), reflect.TypeOf(nodes[2]))
 }

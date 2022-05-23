@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	require "github.com/alecthomas/assert/v2"
 )
 
 func TestMarshalASTComplex(t *testing.T) {

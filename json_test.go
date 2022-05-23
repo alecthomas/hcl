@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	require "github.com/alecthomas/assert/v2"
 )
 
 func TestJSONMarshalling(t *testing.T) {

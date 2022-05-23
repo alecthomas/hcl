@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	require "github.com/alecthomas/assert/v2"
 )
 
 type testSchema struct {

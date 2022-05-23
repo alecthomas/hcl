@@ -3,7 +3,7 @@ package hcl
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	require "github.com/alecthomas/assert/v2"
 )
 
 func TestDedent(t *testing.T) {

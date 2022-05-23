@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	require "github.com/alecthomas/assert/v2"
 	"github.com/alecthomas/repr"
-	"github.com/stretchr/testify/require"
 )
 
 type numberTest int
@@ -566,7 +566,7 @@ func TestUnmarshalPointers(t *testing.T) {
 f = "2017-07-07T00:00:00Z"
 `), &b)
 	require.NoError(t, err)
-	require.NotNil(t, b.F)
+	require.NotZero(t, b.F)
 	require.Equal(t, time.Date(2017, 7, 7, 0, 0, 0, 0, time.UTC), *b.F)
 }
 

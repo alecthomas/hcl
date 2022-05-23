@@ -5,10 +5,9 @@ import (
 	"math/big"
 	"testing"
 
+	require "github.com/alecthomas/assert/v2"
 	"github.com/alecthomas/participle/v2/lexer"
 	"github.com/alecthomas/repr"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestDetach(t *testing.T) {
@@ -192,12 +191,12 @@ EOF
 		t.Run(test.name, func(t *testing.T) {
 			hcl, err := ParseString(test.hcl)
 			if test.fail {
-				assert.Error(t, err)
-			} else if assert.NoError(t, err) {
+				require.Error(t, err)
+			} else if err != nil {
 				normaliseAST(hcl)
-				assert.Equal(t,
+				require.Equal(t,
 					repr.String(test.expected, repr.Indent("  ")),
-					repr.String(hcl, repr.Indent("  ")))
+					repr.String(hcl, repr.Indent("  ")), "%s", err.Error())
 			}
 		})
 	}
