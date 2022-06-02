@@ -101,6 +101,7 @@ func (w *jsonVisitor) Visit(node Node, next func() error) error {
 			fmt.Fprint(w, `,`)
 		}
 		fmt.Fprintf(w, "%q:", node.Key)
+		return Visit(node.Value, w.Visit)
 
 	case *Value:
 		return w.writeValue(node)
