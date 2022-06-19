@@ -108,7 +108,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 			if field.t.Type != remainType {
 				panic(fmt.Sprintf(`"remain" field %q must be of type []*hcl.Entry but is %T`, field.t.Name, field.t.Type))
 			}
-			remaining := []*Entry{}
+			var remaining []*Entry
 			for _, entries := range mentries {
 				remaining = append(remaining, entries...)
 			}
@@ -235,6 +235,8 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 					}
 					field.v.Set(reflect.Append(field.v, el))
 				}
+				// Remove all entries for a slice of struct after processing
+				mentries[tag.name] = nil
 				continue
 			}
 			fallthrough

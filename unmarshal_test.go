@@ -388,6 +388,37 @@ are = true
 				normaliseEntries(i.(*remainStruct).Remain)
 			},
 		},
+		{name: "Remain with blocks",
+			hcl: `
+name = "hello"
+nested {
+  name = "my"
+}
+nested {
+  name = "your"
+}
+message1 = "wonderful"
+message2 = world
+`,
+			dest: remainStruct{
+				Name: "hello",
+				Nested: []*remainNested{
+					{
+						Name: "my",
+					},
+					{
+						Name: "your",
+					},
+				},
+				Remain: []*Entry{
+					attr("message1", str("wonderful")),
+					attr("message2", str("world")),
+				},
+			},
+			fixup: func(i interface{}) {
+				normaliseEntries(i.(*remainStruct).Remain)
+			},
+		},
 		{name: "UnmarshallJSONTaggedStruct",
 			hcl: `
                 block {
@@ -413,8 +444,13 @@ are = true
 }
 
 type remainStruct struct {
-	Name   string   `hcl:"name"`
-	Remain []*Entry `hcl:",remain"`
+	Name   string          `hcl:"name"`
+	Nested []*remainNested `hcl:"nested,optional"`
+	Remain []*Entry        `hcl:",remain"`
+}
+
+type remainNested struct {
+	Name string `hcl:"name"`
 }
 
 func intlistp(i ...int) *[]int { return &i }
