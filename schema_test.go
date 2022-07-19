@@ -66,7 +66,9 @@ block_slice "label0" "label1" { // (repeated)
   attr = string
 }
 
+// default: def
 default_str = string // (optional)
+// enum: a,b,c
 enum_str = string
 `
 const expectedJSONSchema = `
@@ -180,6 +182,9 @@ const expectedJSONSchema = `
     },
     {
       "attribute": {
+        "comments": [
+          "default: def"
+        ],
         "key": "default_str",
         "value": {
           "type": "string"
@@ -192,6 +197,9 @@ const expectedJSONSchema = `
     },
     {
       "attribute": {
+        "comments": [
+          "enum: a,b,c"
+        ],
         "key": "enum_str",
         "value": {
           "type": "string"

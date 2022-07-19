@@ -504,8 +504,18 @@ type tag struct {
 }
 
 func (t tag) comments(opts *marshalState) []string {
-	if (opts.schemaComments || opts.schema) && t.help != "" {
-		return strings.Split(t.help, "\n")
+	if opts.schemaComments || opts.schema {
+		var lines []string
+		if t.help != "" {
+			lines = append(lines, strings.Split(t.help, "\n")...)
+		}
+		if t.enum != "" {
+			lines = append(lines, "enum: "+t.enum)
+		}
+		if t.defaultValue != "" {
+			lines = append(lines, "default: "+t.defaultValue)
+		}
+		return lines
 	}
 	return nil
 }
