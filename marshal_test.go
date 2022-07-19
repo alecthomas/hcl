@@ -328,6 +328,19 @@ attr = "string"
 			`,
 			options: []MarshalOption{WithSchemaComments(true)},
 		},
+		{name: "MarshalHelpAndEnumDefaultTagsIfWithSchemaComments",
+			src: &struct {
+				Attr string `hcl:"attr" help:"An attribute." enum:"blue,green" default:"blue"`
+			}{
+				Attr: "string",
+			},
+			expected: `// An attribute.
+// enum: blue,green
+// default: blue
+attr = "string"
+			`,
+			options: []MarshalOption{WithSchemaComments(true)},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
