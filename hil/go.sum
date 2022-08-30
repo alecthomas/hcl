@@ -1,12 +1,8 @@
 github.com/alecthomas/assert/v2 v2.0.3 h1:WKqJODfOiQG0nEJKFKzDIG3E29CN2/4zR9XGJzKIkbg=
-github.com/alecthomas/hcl v0.1.1-0.20200723030810-fa56972bbf92 h1:dP1KQGUnlUi+71UtFBWumDR/MGzbdQT9+CcfYDylY28=
-github.com/alecthomas/hcl v0.1.1-0.20200723030810-fa56972bbf92/go.mod h1:bTbOZjKcPGuc7o4m7VjHmt0PpWZO70Xhagf3STdQgKs=
-github.com/alecthomas/participle v0.5.0 h1:tT0WyXKiXyzwoCaXCfFlJQjFo1p54xWg9ZccCYJURnE=
-github.com/alecthomas/participle v0.5.0/go.mod h1:HfdmEuwvr12HXQN44HPWXR0lHmVolVYe4dyL6lQ3duY=
+github.com/alecthomas/hcl v0.5.0 h1:KG8gZryED4lc/5nBb26kDRfNm0qWVOc6n/uZgPDKDlc=
+github.com/alecthomas/hcl v0.5.0/go.mod h1:lPLhVFOC9EGH5VwjGJRJeW6PjQWQgd9biWTM6vru/lM=
 github.com/alecthomas/participle/v2 v2.0.0-beta.5 h1:y6dsSYVb1G5eK6mgmy+BgI3Mw35a3WghArZ/Hbebrjo=
 github.com/alecthomas/participle/v2 v2.0.0-beta.5/go.mod h1:RC764t6n4L8D8ITAJv0qdokritYSNR3wV5cVwmIEaMM=
-github.com/alecthomas/repr v0.0.0-20181024024818-d37bc2a10ba1/go.mod h1:xTS7Pm1pD1mvyM075QCDSRqH6qRLXylzS24ZTpRiSzQ=
-github.com/alecthomas/repr v0.0.0-20200325044227-4184120f674c/go.mod h1:xTS7Pm1pD1mvyM075QCDSRqH6qRLXylzS24ZTpRiSzQ=
 github.com/alecthomas/repr v0.1.0 h1:ENn2e1+J3k09gyj2shc0dHr/yjaWSHRlrJ4DPMevDqE=
 github.com/alecthomas/repr v0.1.0/go.mod h1:2kn6fqh/zIyPLmm3ugklbEi5hg5wS435eygvNfaDQL8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

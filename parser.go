@@ -395,7 +395,7 @@ var (
 			{"Body", `[^\n]+`, nil},
 		},
 	}))
-	parser = participle.MustBuild(&AST{},
+	parser = participle.MustBuild[AST](
 		participle.Lexer(lex),
 		participle.Map(unquoteString, "String"),
 		participle.Map(cleanHeredocStart, "Heredoc"),
@@ -432,8 +432,7 @@ func cleanHeredocStart(token lexer.Token) (lexer.Token, error) {
 
 // Parse HCL from an io.Reader.
 func Parse(r io.Reader) (*AST, error) {
-	hcl := &AST{}
-	err := parser.Parse("", r, hcl)
+	hcl, err := parser.Parse("", r)
 	if err != nil {
 		return nil, err
 	}
@@ -442,8 +441,7 @@ func Parse(r io.Reader) (*AST, error) {
 
 // ParseString parses HCL from a string.
 func ParseString(str string) (*AST, error) {
-	hcl := &AST{}
-	err := parser.ParseString("", str, hcl)
+	hcl, err := parser.ParseString("", str)
 	if err != nil {
 		return nil, err
 	}
@@ -452,8 +450,7 @@ func ParseString(str string) (*AST, error) {
 
 // ParseBytes parses HCL from bytes.
 func ParseBytes(data []byte) (*AST, error) {
-	hcl := &AST{}
-	err := parser.ParseBytes("", data, hcl)
+	hcl, err := parser.ParseBytes("", data)
 	if err != nil {
 		return nil, err
 	}

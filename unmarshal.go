@@ -206,7 +206,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 			}
 			err := unmarshalBlock(field.v, entry.Block, opt)
 			if err != nil {
-				return participle.AnnotateError(entry.Pos, err)
+				return participle.Wrapf(entry.Pos, err, "failed to unmarshal block")
 			}
 
 		case reflect.Slice:
@@ -228,7 +228,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 					el := reflect.New(elt).Elem()
 					err := unmarshalBlock(el, entry.Block, opt)
 					if err != nil {
-						return participle.AnnotateError(entry.Pos, err)
+						return participle.Wrapf(entry.Pos, err, "failed to unmarshal block")
 					}
 					if ptr {
 						el = el.Addr()
@@ -261,7 +261,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 				if value != nil {
 					pos = value.Pos
 				}
-				return participle.AnnotateError(pos, err)
+				return participle.Wrapf(pos, err, "failed to unmarshal value")
 			}
 		}
 	}
@@ -316,7 +316,7 @@ func unmarshalBlock(v reflect.Value, block *Block, opt *marshalState) error {
 	}
 	fields, err := flattenFields(v, opt)
 	if err != nil {
-		return participle.AnnotateError(block.Pos, err)
+		return participle.Wrapf(block.Pos, err, "")
 	}
 	labels := block.Labels
 	for _, field := range fields {

@@ -230,7 +230,7 @@ func TestUnmarshal(t *testing.T) {
 			dest: struct {
 				Block labelledBlock `hcl:"block,block"`
 			}{},
-			fail: "2:5: missing label \"name\"",
+			fail: "2:5: failed to unmarshal block: missing label \"name\"",
 		},
 		{name: "TooManyLabels",
 			hcl: `
@@ -241,7 +241,7 @@ func TestUnmarshal(t *testing.T) {
 			dest: struct {
 				Block labelledBlock `hcl:"block,block"`
 			}{},
-			fail: "2:5: too many labels for block \"block\"",
+			fail: "2:5: failed to unmarshal block: too many labels for block \"block\"",
 		},
 		{name: "SliceOfBlocks",
 			hcl: `
@@ -902,7 +902,7 @@ func TestEnumInvalidCases(t *testing.T) {
 			}{
 				Attr: true,
 			},
-			fail: "1:1: expected = after attribute",
+			fail: "1:1: failed to unmarshal value: expected = after attribute",
 		},
 	}
 
