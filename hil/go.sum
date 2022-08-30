@@ -1,6 +1,6 @@
 github.com/alecthomas/assert/v2 v2.0.3 h1:WKqJODfOiQG0nEJKFKzDIG3E29CN2/4zR9XGJzKIkbg=
-github.com/alecthomas/hcl v0.5.0 h1:KG8gZryED4lc/5nBb26kDRfNm0qWVOc6n/uZgPDKDlc=
-github.com/alecthomas/hcl v0.5.0/go.mod h1:lPLhVFOC9EGH5VwjGJRJeW6PjQWQgd9biWTM6vru/lM=
+github.com/alecthomas/hcl v0.5.1-0.20220830052053-fce0b4d3cfe6 h1:dRO7r5Eu9tcrtLQe2FCZCbXvymk6xJ9iimymXz1ZnyM=
+github.com/alecthomas/hcl v0.5.1-0.20220830052053-fce0b4d3cfe6/go.mod h1:I7ywm4p2YDXBNdEItWJ5UhhRvO/IH2RAgRhlovB6kX0=
 github.com/alecthomas/participle/v2 v2.0.0-beta.5 h1:y6dsSYVb1G5eK6mgmy+BgI3Mw35a3WghArZ/Hbebrjo=
 github.com/alecthomas/participle/v2 v2.0.0-beta.5/go.mod h1:RC764t6n4L8D8ITAJv0qdokritYSNR3wV5cVwmIEaMM=
 github.com/alecthomas/repr v0.1.0 h1:ENn2e1+J3k09gyj2shc0dHr/yjaWSHRlrJ4DPMevDqE=
