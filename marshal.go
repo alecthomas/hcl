@@ -51,7 +51,7 @@ func InferHCLTags(v bool) MarshalOption {
 //
 // eg.
 //
-//     attr
+//	attr
 //
 // NOTE: This is non-standard HCL.
 func BareBooleanAttributes(v bool) MarshalOption {
@@ -300,6 +300,14 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 		k = f.v.Type().Elem().Kind()
 	}
 
+	t := f.v.Type()
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if typeImplements(t, textMarshalerInterface) || t == durationType || t == timeType {
+		return &Value{Str: &defaultValue}, nil
+	}
+
 	switch k {
 	case reflect.String:
 		return &Value{Str: &defaultValue}, nil
@@ -463,10 +471,7 @@ func valueToValue(v reflect.Value, opt *marshalState) (*Value, error) {
 
 	case reflect.Map:
 		entries := []*MapEntry{}
-		sorted := []reflect.Value{}
-		for _, key := range v.MapKeys() {
-			sorted = append(sorted, key)
-		}
+		sorted := v.MapKeys()
 		sort.Slice(sorted, func(i, j int) bool {
 			return sorted[i].String() < sorted[j].String()
 		})

@@ -88,6 +88,26 @@ func TestMarshal(t *testing.T) {
 		expected string
 		options  []MarshalOption
 	}{
+		{name: "DurationSchema",
+			src: &struct {
+				Delay time.Duration `hcl:"delay,optional" default:"24h"`
+			}{},
+			expected: `
+// default: 24h
+delay = string // (optional)
+`,
+			options: []MarshalOption{asSchema(true)},
+		},
+		{name: "DurationPtrSchema",
+			src: &struct {
+				Delay *time.Duration `hcl:"delay,optional" default:"24h"`
+			}{},
+			expected: `
+// default: 24h
+delay = string // (optional)
+`,
+			options: []MarshalOption{asSchema(true)},
+		},
 		{name: "VarArgBlockLabels",
 			src: &struct {
 				Block varArgLabelBlock `hcl:"block,block"`
