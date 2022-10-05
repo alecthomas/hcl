@@ -103,25 +103,25 @@ func (w *jsonVisitor) Visit(node Node, next func() error) error {
 		fmt.Fprintf(w, "%q:", node.Key)
 		return Visit(node.Value, w.Visit)
 
-	case *Value:
+	case Value:
 		return w.writeValue(node)
 
 	}
 	return next()
 }
 
-func (w *jsonVisitor) writeValue(node *Value) error {
-	switch {
-	case node.Bool != nil:
-		fmt.Fprintf(w, "%v", *node.Bool)
+func (w *jsonVisitor) writeValue(node Value) error {
+	switch node := node.(type) {
+	case *Bool:
+		fmt.Fprintf(w, "%v", node.Bool)
 
-	case node.Number != nil:
-		fmt.Fprint(w, node.Number.String())
+	case *Number:
+		fmt.Fprint(w, node.String())
 
-	case node.Str != nil:
-		fmt.Fprintf(w, "%q", *node.Str)
+	case *String:
+		fmt.Fprintf(w, "%q", node.Str)
 
-	case node.HaveList:
+	case *List:
 		fmt.Fprint(w, "[")
 		for i, e := range node.List {
 			if i > 0 {
@@ -133,9 +133,9 @@ func (w *jsonVisitor) writeValue(node *Value) error {
 		}
 		fmt.Fprint(w, "]")
 
-	case node.HaveMap:
+	case *Map:
 		fmt.Fprint(w, "{")
-		for i, e := range node.Map {
+		for i, e := range node.Entries {
 			if i > 0 {
 				fmt.Fprint(w, ",")
 			}
@@ -149,8 +149,8 @@ func (w *jsonVisitor) writeValue(node *Value) error {
 		}
 		fmt.Fprint(w, "}")
 
-	case node.Type != nil:
-		fmt.Fprintf(w, "%q", *node.Type)
+	case *Type:
+		fmt.Fprintf(w, "%q", node.Type)
 
 	default:
 		panic(repr.String(node, repr.Hide(lexer.Position{})))

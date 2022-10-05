@@ -40,6 +40,7 @@ linters:
     - forcetypeassert
     - maintidx
     - revive
+    - ireturn
 
 linters-settings:
   govet:
@@ -69,3 +70,4 @@ issues:
     - 'bad syntax for struct tag key'
     - 'bad syntax for struct tag pair'
     - '^ST1012'
+    - '(Detach|Position|EntryKey|Clone).*should have comment or be unexported'

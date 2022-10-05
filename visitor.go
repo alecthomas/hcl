@@ -8,7 +8,7 @@ import (
 //
 // "next" may be called to continue traversal of child nodes.
 func Visit(node Node, visitor func(node Node, next func() error) error) error {
-	if reflect.ValueOf(node).IsNil() { // Workaround for Go's typed nil interfaces.
+	if node == nil || reflect.ValueOf(node).IsNil() { // Workaround for Go's typed nil interfaces.
 		return nil
 	}
 	return visitor(node, func() error {
@@ -43,7 +43,7 @@ func Find(node Node, names ...string) (nodes []Node) {
 
 		case *MapEntry:
 			for _, name := range names {
-				if node.Key.Str != nil && *node.Key.Str == name {
+				if str, ok := node.Key.(*String); ok && str.Str == name {
 					nodes = append(nodes, node)
 					break
 				}

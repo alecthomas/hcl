@@ -44,36 +44,41 @@ func addParentRefs(parent, node Node) {
 			addParentRefs(node, entry)
 		}
 
-	case *Entry:
-		node.Parent = parent
-		if node.Attribute != nil {
-			addParentRefs(node, node.Attribute)
-		} else {
-			addParentRefs(node, node.Block)
-		}
-
 	case *MapEntry:
 		node.Parent = parent
 
-	case *Value:
-		if node == nil {
-			return
-		}
+	case *String:
 		node.Parent = parent
-		switch {
-		case node.HaveList:
-			for _, entry := range node.List {
-				addParentRefs(node, entry)
-			}
-		case node.HaveMap:
-			for _, entry := range node.Map {
-				addParentRefs(node, entry)
-			}
+
+	case *Number:
+		node.Parent = parent
+
+	case *Bool:
+		node.Parent = parent
+
+	case *Type:
+		node.Parent = parent
+
+	case *Heredoc:
+		node.Parent = parent
+
+	case *List:
+		node.Parent = parent
+		for _, entry := range node.List {
+			addParentRefs(node, entry)
+		}
+
+	case *Map:
+		node.Parent = parent
+		for _, entry := range node.Entries {
+			addParentRefs(node, entry)
 		}
 
 	case *Attribute:
 		node.Parent = parent
 		addParentRefs(node, node.Value)
+
+	case nil:
 
 	default:
 		panic(fmt.Sprintf("%T", node))

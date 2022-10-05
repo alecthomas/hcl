@@ -3,6 +3,7 @@ package hcl
 import (
 	"fmt"
 	"math/big"
+	"reflect"
 	"testing"
 
 	require "github.com/alecthomas/assert/v2"
@@ -17,8 +18,8 @@ func TestDetach(t *testing.T) {
 		three {}
 	`)
 	require.NoError(t, err)
-	ok := ast.Entries[1].Block.Detach()
-	require.True(t, ok)
+	ok := ast.Entries[1].Detach()
+	require.True(t, ok, "Could not detach %#v", ast.Entries[1])
 
 	actual, err := MarshalAST(ast)
 	require.NoError(t, err)
@@ -31,14 +32,14 @@ three {
 }
 
 func TestGetHeredoc(t *testing.T) {
-	value := &Value{
-		HeredocDelimiter: "-EOF",
-		Heredoc:          strp("\n    hello\n  world"),
+	value := &Heredoc{
+		Delimiter: "-EOF",
+		Doc:       "\n    hello\n  world",
 	}
 	require.Equal(t, "  hello\nworld", value.GetHeredoc())
-	value = &Value{
-		HeredocDelimiter: "EOF",
-		Heredoc:          strp("\n  hello\n  world"),
+	value = &Heredoc{
+		Delimiter: "EOF",
+		Doc:       "\n  hello\n  world",
 	}
 	require.Equal(t, "  hello\n  world", value.GetHeredoc())
 }
@@ -65,7 +66,7 @@ or another
 EOF
 			`,
 			expected: &AST{
-				Entries: []*Entry{
+				Entries: []Entry{
 					attr("doc", heredoc("EOF", "\nsome thing\nor another")),
 				},
 			},
@@ -78,7 +79,7 @@ EOF
 EOF
 			`,
 			expected: &AST{
-				Entries: []*Entry{
+				Entries: []Entry{
 					attr("doc", heredoc("-EOF", "\n\tsome thing\n\tor another")),
 				},
 			},
@@ -89,8 +90,8 @@ EOF
 EOF
 			`,
 			expected: &AST{
-				Entries: []*Entry{
-					attr("doc", &Value{HeredocDelimiter: "EOF"}),
+				Entries: []Entry{
+					attr("doc", &Heredoc{Delimiter: "EOF"}),
 				},
 			},
 		},
@@ -99,12 +100,10 @@ EOF
 				// A comment
 				attr = true
 			`,
-			expected: hcl(&Entry{
-				Attribute: &Attribute{
-					Key:      "attr",
-					Value:    hbool(true),
-					Comments: []string{"A comment"},
-				},
+			expected: hcl(&Attribute{
+				Key:      "attr",
+				Value:    hbool(true),
+				Comments: []string{"A comment"},
 			}),
 		},
 		{name: "Attributes",
@@ -123,7 +122,7 @@ EOF
 				}
 			`,
 			expected: &AST{
-				Entries: []*Entry{
+				Entries: []Entry{
 					attr("true_bool", hbool(true)),
 					attr("false_bool", hbool(false)),
 					attr("str", str("string")),
@@ -211,15 +210,15 @@ func TestHeredocIndented(t *testing.T) {
 `)
 	require.NoError(t, err)
 	expected := "some thing\nor another"
-	require.Equal(t, expected, hcl.Entries[0].Attribute.Value.GetHeredoc())
+	require.Equal(t, expected, hcl.Entries[0].(*Attribute).Value.(*Heredoc).GetHeredoc())
 }
 
-func heredoc(delim, s string) *Value {
-	return &Value{HeredocDelimiter: delim, Heredoc: &s}
+func heredoc(delim, s string) Value {
+	return &Heredoc{Delimiter: delim, Doc: s}
 }
 
-func hbool(b bool) *Value {
-	return &Value{Bool: (*Bool)(&b)}
+func hbool(b bool) Value {
+	return &Bool{Bool: b}
 }
 
 func normaliseAST(hcl *AST) *AST {
@@ -228,53 +227,61 @@ func normaliseAST(hcl *AST) *AST {
 	return hcl
 }
 
-func normaliseEntries(entries []*Entry) {
+func normaliseEntries(entries []Entry) {
 	for _, entry := range entries {
-		entry.Parent = nil
-		entry.Pos = lexer.Position{}
-		if entry.Block != nil {
-			entry.Block.Pos = lexer.Position{}
-			entry.Block.Parent = nil
-			normaliseEntries(entry.Block.Body)
-		} else {
-			entry.Attribute.Pos = lexer.Position{}
-			entry.Attribute.Parent = nil
-			val := entry.Attribute.Value
+		switch entry := entry.(type) {
+		case *Block:
+			entry.Pos = lexer.Position{}
+			entry.Parent = nil
+			normaliseEntries(entry.Body)
+
+		case *Attribute:
+			entry.Pos = lexer.Position{}
+			entry.Parent = nil
+			val := entry.Value
 			normaliseValue(val)
 		}
 	}
 }
 
-func normaliseValue(val *Value) {
-	if val == nil {
+func normaliseValue(val Value) {
+	rv := reflect.ValueOf(val)
+	if val == nil || rv.IsNil() {
 		return
 	}
-	val.Pos = lexer.Position{}
-	val.Parent = nil
-	for _, entry := range val.Map {
-		entry.Pos = lexer.Position{}
-		entry.Parent = nil
-		normaliseValue(entry.Key)
-		normaliseValue(entry.Value)
+	rv = reflect.Indirect(rv)
+	rv.FieldByName("Pos").Set(reflect.ValueOf(lexer.Position{}))
+	parent := rv.FieldByName("Parent")
+	parent.Set(reflect.Zero(parent.Type()))
+	switch val := val.(type) {
+	case *Map:
+		for _, entry := range val.Entries {
+			entry.Pos = lexer.Position{}
+			entry.Parent = nil
+			normaliseValue(entry.Key)
+			normaliseValue(entry.Value)
+		}
+
+	case *List:
+		for _, entry := range val.List {
+			normaliseValue(entry)
+		}
 	}
-	for _, entry := range val.List {
-		normaliseValue(entry)
-	}
 }
 
-func list(elements ...*Value) *Value {
-	return &Value{List: elements, HaveList: true}
+func list(elements ...Value) Value {
+	return &List{List: elements}
 }
 
-func hmap(kv ...*MapEntry) *Value {
-	return &Value{Map: kv, HaveMap: true}
+func hmap(kv ...*MapEntry) Value {
+	return &Map{Entries: kv}
 }
 
-func hkv(k string, v *Value) *MapEntry {
-	return &MapEntry{Key: &Value{Str: &k}, Value: v}
+func hkv(k string, v Value) *MapEntry {
+	return &MapEntry{Key: &String{Str: k}, Value: v}
 }
 
-func hcl(entries ...*Entry) *AST {
+func hcl(entries ...Entry) *AST {
 	return &AST{Entries: entries}
 }
 
@@ -283,28 +290,26 @@ func trailingComments(ast *AST, comments ...string) *AST {
 	return ast
 }
 
-func block(name string, labels []string, entries ...*Entry) *Entry {
-	return &Entry{Block: &Block{
+func block(name string, labels []string, entries ...Entry) Entry {
+	return &Block{
 		Name:   name,
 		Labels: labels,
 		Body:   entries,
-	}}
-}
-
-func attr(k string, v *Value) *Entry {
-	return &Entry{
-		Attribute: &Attribute{Key: k, Value: v},
 	}
 }
 
-func str(s string) *Value {
-	return &Value{Str: &s}
+func attr(k string, v Value) Entry {
+	return &Attribute{Key: k, Value: v}
 }
 
-func num(n float64) *Value {
+func str(s string) Value {
+	return &String{Str: s}
+}
+
+func num(n float64) Value {
 	s := fmt.Sprintf("%g", n)
 	b := &big.Float{}
 	// b, _, _ := big.ParseFloat(s, 10, 64, 0)
 	_, _, _ = b.Parse(s, 0)
-	return &Value{Number: &Number{b}}
+	return &Number{Float: b}
 }
