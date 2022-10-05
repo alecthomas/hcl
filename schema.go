@@ -38,7 +38,7 @@ func BlockSchema(name string, v interface{}, options ...MarshalOption) (*AST, er
 		return nil, err
 	}
 	return &AST{
-		Entries: []*Entry{{Block: block}},
+		Entries: []Entry{block},
 		Schema:  true,
 	}, nil
 }
@@ -58,35 +58,35 @@ var (
 	boolType = "boolean"
 )
 
-func attrSchema(t reflect.Type) (*Value, error) {
+func attrSchema(t reflect.Type) (Value, error) {
 	if t == durationType || t == timeType || typeImplements(t, textMarshalerInterface) || typeImplements(t, jsonMarshalerInterface) {
-		return &Value{Type: &strType}, nil
+		return &Type{Type: strType}, nil
 	}
 	switch t.Kind() {
 	case reflect.String:
-		return &Value{Type: &strType}, nil
+		return &Type{Type: strType}, nil
 
 	case reflect.Slice:
 		el, err := attrSchema(t.Elem())
 		if err != nil {
 			return nil, err
 		}
-		return &Value{List: []*Value{el}, HaveList: true}, nil
+		return &List{List: []Value{el}}, nil
 
 	case reflect.Map:
 		el, err := attrSchema(t.Elem())
 		if err != nil {
 			return nil, err
 		}
-		return &Value{Map: []*MapEntry{{Key: &Value{Type: &strType}, Value: el}}, HaveMap: true}, nil
+		return &Map{Entries: []*MapEntry{{Key: &Type{Type: strType}, Value: el}}}, nil
 
 	case reflect.Float32, reflect.Float64,
 		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return &Value{Type: &numType}, nil
+		return &Type{Type: numType}, nil
 
 	case reflect.Bool:
-		return &Value{Type: &boolType}, nil
+		return &Type{Type: boolType}, nil
 
 	case reflect.Struct:
 		panic("struct " + t.String() + " used as attribute, is it missing a \"block\" tag?")

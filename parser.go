@@ -4,6 +4,7 @@
 package hcl
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/alecthomas/participle/v2"
 	"github.com/alecthomas/participle/v2/lexer"
-	"github.com/alecthomas/repr"
 )
 
 // Position in source file.
@@ -21,17 +21,43 @@ type Position = lexer.Position
 
 // Node is the the interface implemented by all AST nodes.
 type Node interface {
+	Position() Position
+	Detach() bool
 	children() (children []Node)
+}
+
+// Entries in the root of the AST or a Block.
+type Entries []Entry
+
+func (e Entries) MarshalJSON() ([]byte, error) {
+	out := make([]json.RawMessage, 0, len(e))
+	for _, entry := range e {
+		raw, err := json.Marshal(entry)
+		if err != nil {
+			return nil, err
+		}
+		var kind string
+		switch entry.(type) {
+		case *Attribute:
+			kind = "attribute"
+		case *Block:
+			kind = "block"
+		}
+		out = append(out, []byte(fmt.Sprintf(`{%q: %s}`, kind, raw)))
+	}
+	return json.Marshal(out)
 }
 
 // AST for HCL.
 type AST struct {
 	Pos lexer.Position `parser:"" json:"-"`
 
-	Entries          []*Entry `parser:"@@*" json:"entries,omitempty"`
+	Entries          Entries  `parser:"@@*" json:"entries,omitempty"`
 	TrailingComments []string `parser:"@Comment*" json:"trailingComments,omitempty"`
 	Schema           bool     `parser:"" json:"schema,omitempty"`
 }
+
+func (a *AST) Detach() bool { return false }
 
 // Clone the AST.
 func (a *AST) Clone() *AST {
@@ -43,13 +69,15 @@ func (a *AST) Clone() *AST {
 		TrailingComments: cloneStrings(a.TrailingComments),
 		Schema:           a.Schema,
 	}
-	out.Entries = make([]*Entry, len(a.Entries))
+	out.Entries = make(Entries, len(a.Entries))
 	for i, entry := range a.Entries {
 		out.Entries[i] = entry.Clone()
 	}
 	addParentRefs(nil, out)
 	return out
 }
+
+func (a *AST) Position() Position { return a.Pos }
 
 func (a *AST) children() (children []Node) {
 	for _, entry := range a.Entries {
@@ -59,96 +87,58 @@ func (a *AST) children() (children []Node) {
 }
 
 // Entry at the top-level of a HCL file or block.
-type Entry struct {
-	Pos             lexer.Position `parser:"" json:"-"`
-	Parent          Node           `parser:"" json:"-"`
-	RecursiveSchema bool           `parser:"" json:"-"`
-
-	Block     *Block     `parser:"(   @@" json:"block,omitempty"`
-	Attribute *Attribute `parser:"  | @@ )" json:"attribute,omitempty"`
+type Entry interface {
+	Detach() bool
+	Clone() Entry
+	EntryKey() string
+	Node
 }
 
-// Detach Entry from parent.
-func (e *Entry) Detach() bool {
-	var entries *[]*Entry
-	switch node := e.Parent.(type) {
-	case *Block:
-		entries = &node.Body
-	case *AST:
-		entries = &node.Entries
-	}
-	if entries == nil {
-		return false
-	}
-	for i, entry := range *entries {
-		if entry == e {
-			*entries = append((*entries)[:i], (*entries)[i+1:]...)
-			return true
-		}
-	}
-	return false
-}
+// RecursiveEntry is an Entry representing that a schema is recursive.
+type RecursiveEntry struct{}
 
-func (e *Entry) children() (children []Node) {
-	return []Node{e.Attribute, e.Block}
-}
+func (*RecursiveEntry) Position() Position          { return Position{} }
+func (*RecursiveEntry) children() (children []Node) { return nil }
+func (*RecursiveEntry) Clone() Entry                { return &RecursiveEntry{} }
+func (*RecursiveEntry) Detach() bool                { return false }
+func (*RecursiveEntry) EntryKey() string            { panic("unimplemented") }
 
-// Key of the attribute or block.
-func (e *Entry) Key() string {
-	switch {
-	case e.Attribute != nil:
-		return e.Attribute.Key
+var _ Entry = &RecursiveEntry{}
 
-	case e.Block != nil:
-		return e.Block.Name
-
-	default:
-		panic("???")
-	}
-}
-
-// Clone the AST.
-func (e *Entry) Clone() *Entry {
-	if e == nil {
-		return nil
-	}
-	return &Entry{
-		Pos:       e.Pos,
-		Attribute: e.Attribute.Clone(),
-		Block:     e.Block.Clone(),
-	}
-}
-
-// Attribute is a key+value attribute.
+// Attribute is a key=value attribute.
 type Attribute struct {
 	Pos    lexer.Position `parser:"" json:"-"`
 	Parent Node           `parser:"" json:"-"`
 
 	Comments []string `parser:"@Comment*" json:"comments,omitempty"`
 
-	Key   string `parser:"@Ident ['='" json:"key"`
-	Value *Value `parser:"@@]" json:"value"`
+	Key   string `parser:"@Ident ( '='" json:"key"`
+	Value Value  `parser:"@@ )?" json:"value"`
 
 	// This will be populated during unmarshalling.
-	Default *Value `parser:"" json:"default,omitempty"`
+	Default Value `parser:"" json:"default,omitempty"`
 
 	// This will be parsed from the enum tag and will be helping the validation during unmarshalling
-	Enum []*Value `parser:"" json:"enum,omitempty"`
+	Enum []Value `parser:"" json:"enum,omitempty"`
 
 	// Set for schemas when the attribute is optional.
 	Optional bool `parser:"" json:"optional,omitempty"`
 }
 
+var _ Entry = &Attribute{}
+
+func (a *Attribute) Detach() bool       { return detachEntry(a.Parent, a) }
+func (a *Attribute) Position() Position { return a.Pos }
+func (a *Attribute) EntryKey() string   { return a.Key }
 func (a *Attribute) children() (children []Node) {
 	return []Node{a.Value, a.Default}
 }
-
 func (a *Attribute) String() string {
 	return fmt.Sprintf("%s = %s", a.Key, a.Value)
 }
 
 // Clone the AST.
-func (a *Attribute) Clone() *Attribute {
+func (a *Attribute) Clone() Entry {
 	if a == nil {
 		return nil
 	}
@@ -170,7 +160,7 @@ type Block struct {
 
 	Name   string   `parser:"@Ident" json:"name"`
 	Labels []string `parser:"@( Ident | String )*" json:"labels,omitempty"`
-	Body   []*Entry `parser:"'{' @@*" json:"body"`
+	Body   Entries  `parser:"'{' @@*" json:"body"`
 
 	TrailingComments []string `parser:"@Comment* '}'" json:"trailingComments,omitempty"`
 
@@ -178,14 +168,16 @@ type Block struct {
 	Repeated bool `parser:"" json:"repeated,omitempty"`
 }
 
+var _ Entry = &Block{}
+
+func (b *Block) Position() Position { return b.Pos }
+
+// EntryKey implements Entry
+func (b *Block) EntryKey() string { return b.Name }
+
 // Detach Block from parent.
-//
-// Returns true if successful.
 func (b *Block) Detach() bool {
-	if b.Parent == nil {
-		return false
-	}
-	return b.Parent.(*Entry).Detach()
+	return detachEntry(b.Parent, b)
 }
 
 func (b *Block) children() (children []Node) {
@@ -196,7 +188,7 @@ func (b *Block) children() (children []Node) {
 }
 
 // Clone the AST.
-func (b *Block) Clone() *Block {
+func (b *Block) Clone() Entry {
 	if b == nil {
 		return nil
 	}
@@ -205,7 +197,7 @@ func (b *Block) Clone() *Block {
 		Comments:         cloneStrings(b.Comments),
 		Name:             b.Name,
 		Labels:           cloneStrings(b.Labels),
-		Body:             make([]*Entry, len(b.Body)),
+		Body:             make(Entries, len(b.Body)),
 		TrailingComments: cloneStrings(b.TrailingComments),
 		Repeated:         b.Repeated,
 	}
@@ -222,9 +214,25 @@ type MapEntry struct {
 
 	Comments []string `parser:"@Comment*" json:"comments,omitempty"`
 
-	Key   *Value `parser:"@@ ':'" json:"key"`
-	Value *Value `parser:"@@" json:"value"`
+	Key   Value `parser:"@@ ':'" json:"key"`
+	Value Value `parser:"@@" json:"value"`
 }
+
+func (e *MapEntry) Detach() bool {
+	value, ok := e.Parent.(*Map)
+	if !ok {
+		return false
+	}
+	for i, seek := range value.Entries {
+		if seek == e {
+			value.Entries = append(value.Entries[:i], value.Entries[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+func (e *MapEntry) Position() Position { return e.Pos }
 
 func (e *MapEntry) children() (children []Node) {
 	return []Node{e.Key, e.Value}
@@ -244,20 +252,57 @@ func (e *MapEntry) Clone() *MapEntry {
 }
 
 // Bool represents a parsed boolean value.
-type Bool bool
+type Bool struct {
+	Pos    lexer.Position `parser:"" json:"-"`
+	Parent Node           `parser:"" json:"-"`
 
-func (b *Bool) Capture(values []string) error { *b = values[0] == "true"; return nil } // nolint: golint
+	Bool bool `parser:"@'true' | 'false'" json:"bool,omitempty"`
+}
+
+var _ Value = &Bool{}
+
+func (b *Bool) Detach() bool                { return false }
+func (b *Bool) Position() lexer.Position    { return b.Pos }
+func (b *Bool) children() (children []Node) { return nil }
+func (b *Bool) Clone() Value                { clone := *b; return &clone }
+func (b *Bool) String() string              { return strconv.FormatBool(b.Bool) }
+func (b *Bool) value()                      {}
+
+func (b *Bool) Capture(values []string) error { b.Bool = values[0] == "true"; return nil } // nolint: golint
 
 var needsOctalPrefix = regexp.MustCompile(`^0\d+$`)
 
 // Number of arbitrary precision.
-type Number struct{ *big.Float }
+type Number struct {
+	Pos    lexer.Position `parser:"" json:"-"`
+	Parent Node           `parser:"" json:"-"`
 
+	Float *big.Float `parser:"@Number" json:"number,omitempty"`
+}
+
+var _ Value = &Number{}
+
+func (n *Number) Detach() bool                { return false }
+func (n *Number) Position() lexer.Position    { return n.Pos }
+func (n *Number) children() (children []Node) { return nil }
+func (n *Number) Clone() Value {
+	clone := *n
+	clone.Float.Copy(n.Float)
+	return &clone
+}
+func (n *Number) value() {}
+
+func (n *Number) String() string   { return n.Float.String() }
 func (n *Number) GoString() string { return n.String() }
 
-// Capture override because big.Float doesn't directly support 0-prefix octal parsing... why?
-func (n *Number) Capture(values []string) error {
-	value := values[0]
+// Parse override because big.Float doesn't directly support 0-prefix octal parsing... why?
+func (n *Number) Parse(lex *lexer.PeekingLexer) error {
+	token := lex.Peek()
+	if token.Type != numberType {
+		return participle.NextMatch
+	}
+	token = lex.Next()
+	value := token.Value
 	if needsOctalPrefix.MatchString(value) {
 		value = "0o" + value[1:]
 	}
@@ -266,117 +311,154 @@ func (n *Number) Capture(values []string) error {
 	return err
 }
 
-// Value is a scalar, list or map.
-type Value struct {
+// Value represents a terminal value, either scalar or a map or list.
+type Value interface {
+	value()
+	Clone() Value
+	String() string
+	Node
+}
+
+// Type represents a scalar type name of an attribute.
+type Type struct {
 	Pos    lexer.Position `parser:"" json:"-"`
 	Parent Node           `parser:"" json:"-"`
 
-	Bool             *Bool       `parser:"(  @('true' | 'false')" json:"bool,omitempty"`
-	Number           *Number     `parser:" | @Number" json:"number,omitempty"`
-	Type             *string     `parser:" | @('number':Ident | 'string':Ident | 'boolean':Ident)" json:"type,omitempty"`
-	Str              *string     `parser:" | @(String | Ident)" json:"str,omitempty"`
-	HeredocDelimiter string      `parser:" | (@Heredoc" json:"heredocDelimiter,omitempty"`
-	Heredoc          *string     `parser:"     @(Body | EOL)* End)" json:"heredoc,omitempty"`
-	HaveList         bool        `parser:" | ( @'['" json:"haveList,omitempty"` // Need this to detect empty lists.
-	List             []*Value    `parser:"     ( @@ ( ',' @@ )* )? ','? ']' )" json:"list,omitempty"`
-	HaveMap          bool        `parser:" | ( @'{'" json:"haveMap,omitempty"` // Need this to detect empty maps.
-	Map              []*MapEntry `parser:"     ( @@ ( ',' @@ )* ','? )? '}' ) )" json:"map,omitempty"`
+	Type string `parser:"@('number':Ident | 'string':Ident | 'boolean':Ident)" json:"type,omitempty"`
 }
 
-// Clone the AST.
-func (v *Value) Clone() *Value {
-	if v == nil {
-		return nil
-	}
-	out := &Value{}
-	*out = *v
-	switch {
-	case out.Number != nil:
-		out.Number = &Number{}
-		out.Number.Float.Copy(v.Number.Float)
+var _ Value = &Type{}
 
-	case v.HaveList:
-		out.List = make([]*Value, len(v.List))
-		for i, value := range v.List {
-			out.List[i] = value.Clone()
-		}
+func (t *Type) value()                      {}
+func (t *Type) Clone() Value                { clone := *t; return &clone }
+func (t *Type) String() string              { return t.Type }
+func (t *Type) Detach() bool                { return false }
+func (t *Type) Position() lexer.Position    { return t.Pos }
+func (t *Type) children() (children []Node) { return nil }
 
-	case v.HaveMap:
-		out.Map = make([]*MapEntry, len(v.Map))
-		for i, entry := range out.Map {
-			out.Map[i] = entry.Clone()
-		}
-	}
-	return out
+// String literal.
+type String struct {
+	Pos    lexer.Position `parser:"" json:"-"`
+	Parent Node           `parser:"" json:"-"`
+
+	Str string `parser:"@(String | Ident)" json:"str,omitempty"`
 }
 
-func (v *Value) children() (children []Node) {
-	for _, el := range v.List {
-		children = append(children, el)
-	}
-	for _, el := range v.Map {
-		children = append(children, el)
-	}
-	return
+var _ Value = &String{}
+
+func (s *String) Clone() Value                { clone := *s; return &clone }
+func (s *String) String() string              { return strconv.Quote(s.Str) }
+func (s *String) Detach() bool                { return false }
+func (s *String) Position() lexer.Position    { return s.Pos }
+func (s *String) children() (children []Node) { return nil }
+func (s *String) value()                      {}
+
+// Heredoc represents a heredoc string.
+type Heredoc struct {
+	Pos    lexer.Position `parser:"" json:"-"`
+	Parent Node           `parser:"" json:"-"`
+
+	Delimiter string `parser:"(@Heredoc" json:"heredocDelimiter,omitempty"`
+	Doc       string `parser:" @(Body | EOL)* End)" json:"heredoc,omitempty"`
 }
 
-func (v *Value) String() string {
-	switch {
-	case v.Bool != nil:
-		return fmt.Sprintf("%v", *v.Bool)
+var _ Value = &Heredoc{}
 
-	case v.Number != nil:
-		return v.Number.String()
-
-	case v.Str != nil:
-		return fmt.Sprintf("%q", *v.Str)
-
-	case v.HeredocDelimiter != "":
-		heredoc := ""
-		if v.Heredoc != nil {
-			heredoc = *v.Heredoc
-		}
-		return fmt.Sprintf("<<%s%s\n%s", v.HeredocDelimiter, heredoc, strings.TrimPrefix(v.HeredocDelimiter, "-"))
-
-	case v.HaveList:
-		entries := []string{}
-		for _, e := range v.List {
-			entries = append(entries, e.String())
-		}
-		return fmt.Sprintf("[%s]", strings.Join(entries, ", "))
-
-	case v.HaveMap:
-		entries := []string{}
-		for _, e := range v.Map {
-			entries = append(entries, fmt.Sprintf("%s: %s", e.Key, e.Value))
-		}
-		return fmt.Sprintf("{%s}", strings.Join(entries, ", "))
-
-	case v.Type != nil:
-		return fmt.Sprintf("%s", *v.Type)
-
-	default:
-		panic(repr.String(v, repr.Hide(lexer.Position{})))
-	}
+func (h *Heredoc) Clone() Value { clone := *h; return &clone }
+func (h *Heredoc) String() string {
+	return fmt.Sprintf("<<%s%s\n%s", h.Delimiter, h.Doc, strings.TrimPrefix(h.Delimiter, "-"))
 }
+func (h *Heredoc) value()                      {}
+func (h *Heredoc) Detach() bool                { return false }
+func (h *Heredoc) Position() lexer.Position    { return h.Pos }
+func (h *Heredoc) children() (children []Node) { return nil }
 
 // GetHeredoc gets the heredoc as a string.
 //
 // This will correctly format indented heredocs.
-func (v *Value) GetHeredoc() string {
-	if v == nil {
-		return ""
-	}
-	heredoc := ""
-	if v.Heredoc != nil {
-		// The [1:] here removes a \n lexing artifact.
-		heredoc = (*v.Heredoc)[1:]
-	}
-	if v.HeredocDelimiter[0] != '-' {
+func (h *Heredoc) GetHeredoc() string {
+	heredoc := h.Doc[1:] // Removes a lexing artefact.
+	if h.Delimiter[0] != '-' {
 		return heredoc
 	}
 	return dedent(heredoc)
 }
+
+// A List of values.
+type List struct {
+	Pos    lexer.Position `parser:"" json:"-"`
+	Parent Node           `parser:"" json:"-"`
+
+	List []Value `parser:"( '[' ( @@ ( ',' @@ )* )? ','? ']' )" json:"list,omitempty"`
+}
+
+func (l *List) Clone() Value {
+	out := *l
+	for i, value := range l.List {
+		out.List[i] = value.Clone()
+	}
+	return &out
+}
+
+func (l *List) String() string {
+	out := strings.Builder{}
+	out.WriteRune('[')
+	for i, e := range l.List {
+		if i > 0 {
+			out.WriteString(", ")
+		}
+		out.WriteString(e.String())
+	}
+	out.WriteRune(']')
+	return out.String()
+}
+
+var _ Value = &List{}
+
+func (l *List) Detach() bool                { return false }
+func (l *List) Position() lexer.Position    { return l.Pos }
+func (l *List) children() (children []Node) { return nil }
+func (l *List) value()                      {}
+
+// A Map of key to value.
+type Map struct {
+	Pos    lexer.Position `parser:"" json:"-"`
+	Parent Node           `parser:"" json:"-"`
+
+	Entries []*MapEntry `parser:"( '{' ( @@ ( ',' @@ )* ','? )? '}' )" json:"map,omitempty"`
+}
+
+func (m *Map) Clone() Value {
+	out := *m
+	for i, entry := range m.Entries {
+		out.Entries[i] = entry.Clone()
+	}
+	return &out
+}
+func (m *Map) String() string {
+	out := &strings.Builder{}
+	out.WriteRune('{')
+	for i, e := range m.Entries {
+		if i > 0 {
+			out.WriteString(", ")
+		}
+		fmt.Fprintf(out, "%s: %s", e.Key, e.Value)
+	}
+	out.WriteRune('}')
+	return out.String()
+}
+
+var _ Value = &Map{}
+
+func (m *Map) Detach() bool             { return false }
+func (m *Map) Position() lexer.Position { return m.Pos }
+func (m *Map) children() (children []Node) {
+	for _, entry := range m.Entries {
+		children = append(children, entry)
+	}
+	return
+}
+func (m *Map) value() {}
 
 var (
 	lex = lexer.Must(lexer.New(lexer.Rules{
@@ -395,12 +477,15 @@ var (
 			{"Body", `[^\n]+`, nil},
 		},
 	}))
-	parser = participle.MustBuild[AST](
+	numberType = lex.Symbols()["Number"]
+	parser     = participle.MustBuild[AST](
 		participle.Lexer(lex),
 		participle.Map(unquoteString, "String"),
 		participle.Map(cleanHeredocStart, "Heredoc"),
 		participle.Map(stripComment, "Comment"),
 		participle.Elide("Whitespace"),
+		participle.Union[Entry](&Block{}, &Attribute{}),
+		participle.Union[Value](&Bool{}, &Type{}, &String{}, &Number{}, &List{}, &Map{}, &Heredoc{}),
 		// We need lookahead to ensure prefixed comments are associated with the right nodes.
 		participle.UseLookahead(50))
 )
@@ -464,4 +549,24 @@ func cloneStrings(strings []string) []string {
 	out := make([]string, len(strings))
 	copy(out, strings)
 	return out
+}
+
+func detachEntry(parent Node, entry Entry) bool {
+	var entries *Entries
+	switch node := parent.(type) {
+	case *Block:
+		entries = &node.Body
+	case *AST:
+		entries = &node.Entries
+	}
+	if entries == nil {
+		return false
+	}
+	for i, e := range *entries {
+		if e == entry {
+			*entries = append((*entries)[:i], (*entries)[i+1:]...)
+			return true
+		}
+	}
+	return false
 }

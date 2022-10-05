@@ -152,7 +152,7 @@ func marshalToAST(v interface{}, opt *marshalState) (*AST, error) {
 	return ast, nil
 }
 
-func structToEntries(v reflect.Value, opt *marshalState) (entries []*Entry, labels []string, err error) {
+func structToEntries(v reflect.Value, opt *marshalState) (entries []Entry, labels []string, err error) {
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
 			if !opt.schema {
@@ -165,8 +165,8 @@ func structToEntries(v reflect.Value, opt *marshalState) (entries []*Entry, labe
 
 	// Check for recursive structures.
 	if opt.schema && opt.seenStructs[v.Type()] {
-		return []*Entry{
-			{RecursiveSchema: true},
+		return []Entry{
+			&RecursiveEntry{},
 		}, nil, nil
 	}
 	opt.seenStructs[v.Type()] = true
@@ -207,14 +207,14 @@ func structToEntries(v reflect.Value, opt *marshalState) (entries []*Entry, labe
 					return nil, nil, err
 				}
 				for _, block := range blocks {
-					entries = append(entries, &Entry{Block: block})
+					entries = append(entries, block)
 				}
 			} else {
 				block, err := valueToBlock(field.v, tag, opt)
 				if err != nil {
 					return nil, nil, err
 				}
-				entries = append(entries, &Entry{Block: block})
+				entries = append(entries, block)
 			}
 
 		default:
@@ -232,7 +232,7 @@ func structToEntries(v reflect.Value, opt *marshalState) (entries []*Entry, labe
 			} else if attr.Value == nil {
 				return nil, nil, fmt.Errorf("required value cannot be nil")
 			}
-			entries = append(entries, &Entry{Attribute: attr})
+			entries = append(entries, attr)
 		}
 	}
 	return entries, labels, nil
@@ -261,7 +261,7 @@ func fieldToAttr(field field, tag tag, opt *marshalState) (*Attribute, error) {
 	return attr, err
 }
 
-func defaultValueFromTag(f field, defaultValue string) (*Value, error) {
+func defaultValueFromTag(f field, defaultValue string) (Value, error) {
 	v, err := valueFromTag(f, defaultValue)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing default value: %v", err)
@@ -270,13 +270,13 @@ func defaultValueFromTag(f field, defaultValue string) (*Value, error) {
 }
 
 // enumValuesFromTag parses the enum string from tag into a list of Values
-func enumValuesFromTag(f field, enum string) ([]*Value, error) {
+func enumValuesFromTag(f field, enum string) ([]Value, error) {
 	if enum == "" {
 		return nil, nil
 	}
 
 	enums := strings.Split(enum, ",")
-	list := make([]*Value, 0, len(enums))
+	list := make([]Value, 0, len(enums))
 	for _, e := range enums {
 		enumVal, err := valueFromTag(f, e)
 		if err != nil {
@@ -290,7 +290,7 @@ func enumValuesFromTag(f field, enum string) ([]*Value, error) {
 
 }
 
-func valueFromTag(f field, defaultValue string) (*Value, error) {
+func valueFromTag(f field, defaultValue string) (Value, error) {
 	if defaultValue == "" {
 		return nil, nil // nolint: nilnil
 	}
@@ -305,28 +305,24 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 		t = t.Elem()
 	}
 	if typeImplements(t, textMarshalerInterface) || t == durationType || t == timeType {
-		return &Value{Str: &defaultValue}, nil
+		return &String{Str: defaultValue}, nil
 	}
 
 	switch k {
 	case reflect.String:
-		return &Value{Str: &defaultValue}, nil
+		return &String{Str: defaultValue}, nil
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		n, err := strconv.ParseInt(defaultValue, 0, 64)
 		if err != nil {
 			return nil, fmt.Errorf("error converting %q to int", defaultValue)
 		}
-		return &Value{
-			Number: &Number{Float: big.NewFloat(0).SetInt64(n)},
-		}, nil
+		return &Number{Float: big.NewFloat(0).SetInt64(n)}, nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		n, err := strconv.ParseUint(defaultValue, 0, 64)
 		if err != nil {
 			return nil, fmt.Errorf("error converting %q to uint", defaultValue)
 		}
-		return &Value{
-			Number: &Number{big.NewFloat(0).SetUint64(n)},
-		}, nil
+		return &Number{Float: big.NewFloat(0).SetUint64(n)}, nil
 	case reflect.Float32, reflect.Float64:
 		size := 64
 		if k == reflect.Float32 {
@@ -336,18 +332,13 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error converting %q to float", defaultValue)
 		}
-		return &Value{
-			Number: &Number{big.NewFloat(n)},
-		}, nil
+		return &Number{Float: big.NewFloat(n)}, nil
 	case reflect.Bool:
 		b, err := strconv.ParseBool(defaultValue)
 		if err != nil {
 			return nil, fmt.Errorf("error converting %q to bool", defaultValue)
 		}
-		v := Bool(b)
-		return &Value{
-			Bool: &v,
-		}, nil
+		return &Bool{Bool: b}, nil
 	case reflect.Map:
 		mapEntries := []*MapEntry{}
 		entries := strings.Split(defaultValue, ";")
@@ -359,7 +350,7 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 				return nil, fmt.Errorf("error parsing map %q into pairs", entry)
 			}
 			v := pair[1]
-			key := &Value{Str: &pair[0]}
+			key := &String{Str: pair[0]}
 			valueType := f.t.Type.Elem()
 			valueKind := valueType.Kind()
 			if valueKind == reflect.Map || valueKind == reflect.Slice {
@@ -389,12 +380,9 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 			mapEntries = append(mapEntries, mEntries[k])
 		}
 
-		return &Value{
-			HaveMap: true,
-			Map:     mapEntries,
-		}, nil
+		return &Map{Entries: mapEntries}, nil
 	case reflect.Slice:
-		slice := []*Value{}
+		slice := []Value{}
 		list := strings.Split(defaultValue, ",")
 		valueType := f.t.Type.Elem()
 		valueKind := valueType.Kind()
@@ -413,16 +401,13 @@ func valueFromTag(f field, defaultValue string) (*Value, error) {
 			slice = append(slice, value)
 		}
 
-		return &Value{
-			HaveList: true,
-			List:     slice,
-		}, nil
+		return &List{List: slice}, nil
 	default:
 		return nil, fmt.Errorf("only primitive types, map & slices can have tag value, not %q", f.v.Type())
 	}
 }
 
-func valueToValue(v reflect.Value, opt *marshalState) (*Value, error) {
+func valueToValue(v reflect.Value, opt *marshalState) (Value, error) {
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
@@ -430,7 +415,7 @@ func valueToValue(v reflect.Value, opt *marshalState) (*Value, error) {
 	t := v.Type()
 	if t == durationType {
 		s := v.Interface().(time.Duration).String()
-		return &Value{Str: &s}, nil
+		return &String{Str: s}, nil
 	} else if uv, ok := implements(v, textMarshalerInterface); ok {
 		tm := uv.Interface().(encoding.TextMarshaler)
 		b, err := tm.MarshalText()
@@ -438,7 +423,7 @@ func valueToValue(v reflect.Value, opt *marshalState) (*Value, error) {
 			return nil, err
 		}
 		s := string(b)
-		return &Value{Str: &s}, nil
+		return &String{Str: s}, nil
 	} else if uv, ok := implements(v, jsonMarshalerInterface); ok {
 		jm := uv.Interface().(json.Marshaler)
 		b, err := jm.MarshalJSON()
@@ -446,19 +431,19 @@ func valueToValue(v reflect.Value, opt *marshalState) (*Value, error) {
 			return nil, err
 		}
 		s := string(b)
-		return &Value{Str: &s}, nil
+		return &String{Str: s}, nil
 	}
 	switch t.Kind() {
 	case reflect.String:
 		s := v.Interface().(string)
 		if opt.hereDocsForMultiline == 0 || strings.Count(s, "\n") < opt.hereDocsForMultiline {
-			return &Value{Str: &s}, nil
+			return &String{Str: s}, nil
 		}
 		s = "\n" + s
-		return &Value{HeredocDelimiter: "-EOF", Heredoc: &s}, nil
+		return &Heredoc{Delimiter: "-EOF", Doc: s}, nil
 
 	case reflect.Slice:
-		list := []*Value{}
+		list := []Value{}
 		for i := 0; i < v.Len(); i++ {
 			el := v.Index(i)
 			elv, err := valueToValue(el, opt)
@@ -467,7 +452,7 @@ func valueToValue(v reflect.Value, opt *marshalState) (*Value, error) {
 			}
 			list = append(list, elv)
 		}
-		return &Value{List: list, HaveList: true}, nil
+		return &List{List: list}, nil
 
 	case reflect.Map:
 		entries := []*MapEntry{}
@@ -482,30 +467,29 @@ func valueToValue(v reflect.Value, opt *marshalState) (*Value, error) {
 			}
 			keyStr := key.String()
 			entries = append(entries, &MapEntry{
-				Key:   &Value{Str: &keyStr},
+				Key:   &String{Str: keyStr},
 				Value: value,
 			})
 		}
-		return &Value{Map: entries, HaveMap: true}, nil
+		return &Map{Entries: entries}, nil
 
 	case reflect.Float32, reflect.Float64:
-		return &Value{Number: &Number{big.NewFloat(v.Float())}}, nil
+		return &Number{Float: big.NewFloat(v.Float())}, nil
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return &Value{Number: &Number{big.NewFloat(0).SetInt64(v.Int())}}, nil
+		return &Number{Float: big.NewFloat(0).SetInt64(v.Int())}, nil
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return &Value{Number: &Number{big.NewFloat(0).SetUint64(v.Uint())}}, nil
+		return &Number{Float: big.NewFloat(0).SetUint64(v.Uint())}, nil
 
 	case reflect.Bool:
-		b := v.Bool()
-		return &Value{Bool: (*Bool)(&b)}, nil
+		return &Bool{Bool: v.Bool()}, nil
 
 	default:
 		switch t {
 		case timeType:
 			s := v.Interface().(time.Time).Format(time.RFC3339)
-			return &Value{Str: &s}, nil
+			return &String{Str: s}, nil
 
 		default:
 			panic(t.String())
@@ -543,7 +527,7 @@ func marshalNode(w io.Writer, indent string, node Node) error {
 		return marshalBlock(w, indent, node)
 	case *Attribute:
 		return marshalAttribute(w, indent, node)
-	case *Value:
+	case Value:
 		return marshalValue(w, indent, node)
 	default:
 		return fmt.Errorf("can't marshal node of type %T", node)
@@ -559,28 +543,32 @@ func marshalAST(w io.Writer, indent string, node *AST) error {
 	return nil
 }
 
-func marshalEntries(w io.Writer, indent string, entries []*Entry) error {
+func marshalEntries(w io.Writer, indent string, entries []Entry) error {
 	prevAttr := true
 	for i, entry := range entries {
-		if block := entry.Block; block != nil {
+		switch entry := entry.(type) {
+		case *Block:
 			if i > 0 {
 				fmt.Fprintln(w)
 			}
-			if err := marshalBlock(w, indent, block); err != nil {
+			if err := marshalBlock(w, indent, entry); err != nil {
 				return err
 			}
 			prevAttr = false
-		} else if attr := entry.Attribute; attr != nil { // nolint: gocritic
+
+		case *Attribute:
 			if !prevAttr {
 				fmt.Fprintln(w)
 			}
-			if err := marshalAttribute(w, indent, attr); err != nil {
+			if err := marshalAttribute(w, indent, entry); err != nil {
 				return err
 			}
 			prevAttr = true
-		} else if entry.RecursiveSchema {
+
+		case *RecursiveEntry:
 			fmt.Fprintf(w, "%s// (recursive)\n", indent)
-		} else {
+
+		default:
 			panic("??")
 		}
 	}
@@ -601,9 +589,9 @@ func marshalAttribute(w io.Writer, indent string, attribute *Attribute) error {
 	return nil
 }
 
-func marshalValue(w io.Writer, indent string, value *Value) error {
-	if value.HaveMap {
-		return marshalMap(w, indent+"  ", value.Map)
+func marshalValue(w io.Writer, indent string, value Value) error {
+	if value, ok := value.(*Map); ok {
+		return marshalMap(w, indent+"  ", value.Entries)
 	}
 	fmt.Fprintf(w, "%s", value)
 	return nil

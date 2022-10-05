@@ -48,6 +48,7 @@ func runTests(t *testing.T, tests []test) {
 	t.Helper()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Helper()
 			rv := reflect.New(reflect.TypeOf(test.dest))
 			actual := rv.Interface()
 			err := Unmarshal([]byte(test.hcl), actual, test.options...)
@@ -378,7 +379,7 @@ are = true
 `,
 			dest: remainStruct{
 				Name: "hello",
-				Remain: []*Entry{
+				Remain: []Entry{
 					attr("are", hbool(true)),
 					attr("how", num(1)),
 					attr("world", str("world")),
@@ -410,7 +411,7 @@ message2 = world
 						Name: "your",
 					},
 				},
-				Remain: []*Entry{
+				Remain: []Entry{
 					attr("message1", str("wonderful")),
 					attr("message2", str("world")),
 				},
@@ -446,7 +447,7 @@ message2 = world
 type remainStruct struct {
 	Name   string          `hcl:"name"`
 	Nested []*remainNested `hcl:"nested,optional"`
-	Remain []*Entry        `hcl:",remain"`
+	Remain []Entry         `hcl:",remain"`
 }
 
 type remainNested struct {
@@ -586,7 +587,7 @@ func TestUnmarshalBlock(t *testing.T) {
 	hcl, err := ParseString(config)
 	require.NoError(t, err)
 	rule := &Rule{}
-	err = UnmarshalBlock(hcl.Entries[0].Block, rule)
+	err = UnmarshalBlock(hcl.Entries[0].(*Block), rule)
 	require.NoError(t, err)
 	require.Equal(t, &Rule{
 		Target: "/**",

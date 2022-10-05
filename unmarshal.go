@@ -19,7 +19,7 @@ var (
 	textMarshalerInterface   = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
 	jsonUnmarshalerInterface = reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()
 	jsonMarshalerInterface   = reflect.TypeOf((*json.Marshaler)(nil)).Elem()
-	remainType               = reflect.TypeOf([]*Entry{})
+	remainType               = reflect.TypeOf([]Entry{})
 	durationType             = reflect.TypeOf(time.Duration(0))
 	timeType                 = reflect.TypeOf(time.Time{})
 )
@@ -69,20 +69,22 @@ func UnmarshalBlock(block *Block, v interface{}, options ...MarshalOption) error
 	return unmarshalBlock(rv, block, opt)
 }
 
-func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) error {
+func unmarshalEntries(v reflect.Value, entries []Entry, opt *marshalState) error {
 	if v.Kind() != reflect.Struct {
 		return fmt.Errorf("%s must be a struct", v.Type())
 	}
 	// Collect entries from the source into a map.
-	seen := map[string]*Entry{}
-	mentries := make(map[string][]*Entry, len(entries))
+	seen := map[string]Entry{}
+	mentries := make(map[string][]Entry, len(entries))
 	for _, entry := range entries {
-		key := entry.Key()
+		key := entry.EntryKey()
 		existing, ok := mentries[key]
 		if ok {
+			_, existingIsBlock := existing[0].(*Block)
+			_, newIsBlock := entry.(*Block)
 			// Mismatch in type.
-			if !((existing[0].Block == nil) == (entry.Block == nil)) {
-				return participle.Errorf(existing[0].Pos, "%s: %s cannot be both block and attribute", entry.Pos, key)
+			if existingIsBlock != newIsBlock {
+				return participle.Errorf(existing[0].Position(), "%s: %s cannot be both block and attribute", entry.Position(), key)
 			}
 		}
 		mentries[key] = append(mentries[key], entry)
@@ -108,12 +110,12 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 			if field.t.Type != remainType {
 				panic(fmt.Sprintf(`"remain" field %q must be of type []*hcl.Entry but is %T`, field.t.Name, field.t.Type))
 			}
-			var remaining []*Entry
+			var remaining []Entry
 			for _, entries := range mentries {
 				remaining = append(remaining, entries...)
 			}
 			sort.Slice(remaining, func(i, j int) bool {
-				return remaining[i].Key() < remaining[j].Key()
+				return remaining[i].EntryKey() < remaining[j].EntryKey()
 			})
 			field.v.Set(reflect.ValueOf(remaining))
 			return nil
@@ -161,34 +163,34 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 		}
 
 		// Check for unmarshaler interfaces and other special cases.
-		if entry.Attribute != nil {
-			val := entry.Attribute.Value
+		if entry, ok := entry.(*Attribute); ok {
+			val, isString := entry.Value.(*String)
 			if uv, ok := implements(field.v, jsonUnmarshalerInterface); ok {
 				err := uv.Interface().(json.Unmarshaler).UnmarshalJSON([]byte(val.String()))
 				if err != nil {
-					return participle.Wrapf(val.Pos, err, "invalid value")
+					return participle.Wrapf(val.Position(), err, "invalid value")
 				}
 				continue
-			} else if uv, ok := implements(field.v, textUnmarshalerInterface); ok {
-				err := uv.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(*val.Str))
+			} else if uv, ok := implements(field.v, textUnmarshalerInterface); ok && isString {
+				err := uv.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(val.Str))
 				if err != nil {
-					return participle.Wrapf(val.Pos, err, "invalid value")
+					return participle.Wrapf(val.Position(), err, "invalid value")
 				}
 				continue
-			} else if val != nil && val.Str != nil {
+			} else if val != nil && isString {
 				switch field.v.Interface().(type) {
 				case time.Duration:
-					d, err := time.ParseDuration(*val.Str)
+					d, err := time.ParseDuration(val.Str)
 					if err != nil {
-						return participle.Wrapf(val.Pos, err, "invalid duration")
+						return participle.Wrapf(val.Position(), err, "invalid duration")
 					}
 					field.v.Set(reflect.ValueOf(d))
 					continue
 
 				case time.Time:
-					t, err := time.Parse(time.RFC3339, *val.Str)
+					t, err := time.Parse(time.RFC3339, val.Str)
 					if err != nil {
-						return participle.Wrapf(val.Pos, err, "invalid time")
+						return participle.Wrapf(val.Position(), err, "invalid time")
 					}
 					field.v.Set(reflect.ValueOf(t))
 					continue
@@ -199,14 +201,14 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 		switch field.v.Kind() {
 		case reflect.Struct:
 			if len(entries) > 0 {
-				return participle.Errorf(entry.Pos, "duplicate field %q at %s", entry.Key(), entry.Pos)
+				return participle.Errorf(entry.Position(), "duplicate field %q at %s", entry.EntryKey(), entry.Position())
 			}
-			if entry.Attribute != nil {
+			if entry, ok := entry.(*Attribute); ok {
 				return participle.Errorf(entry.Pos, "expected a block for %q but got an attribute", tag.name)
 			}
-			err := unmarshalBlock(field.v, entry.Block, opt)
+			err := unmarshalBlock(field.v, entry.(*Block), opt)
 			if err != nil {
-				return participle.Wrapf(entry.Pos, err, "failed to unmarshal block")
+				return participle.Wrapf(entry.Position(), err, "failed to unmarshal block")
 			}
 
 		case reflect.Slice:
@@ -220,15 +222,15 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 
 			if elt.Kind() == reflect.Struct {
 				mentries[field.t.Name] = nil
-				entries = append([]*Entry{entry}, entries...)
+				entries = append([]Entry{entry}, entries...)
 				for _, entry := range entries {
-					if entry.Attribute != nil {
+					if entry, ok := entry.(*Attribute); ok {
 						return participle.Errorf(entry.Pos, "expected a block for %q but got an attribute", tag.name)
 					}
 					el := reflect.New(elt).Elem()
-					err := unmarshalBlock(el, entry.Block, opt)
+					err := unmarshalBlock(el, entry.(*Block), opt)
 					if err != nil {
-						return participle.Wrapf(entry.Pos, err, "failed to unmarshal block")
+						return participle.Wrapf(entry.Position(), err, "failed to unmarshal block")
 					}
 					if ptr {
 						el = el.Addr()
@@ -244,12 +246,13 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 		default:
 			// Anything else must be a scalar value.
 			if len(entries) > 0 {
-				return participle.Errorf(entry.Pos, "duplicate field %q at %s", entry.Key(), entries[0].Pos)
+				return participle.Errorf(entry.Position(), "duplicate field %q at %s", entry.EntryKey(), entries[0].Position())
 			}
-			if entry.Block != nil {
-				return participle.Errorf(entry.Pos, "expected an attribute for %q but got a block", tag.name)
+			if _, ok := entry.(*Block); ok {
+				return participle.Errorf(entry.Position(), "expected an attribute for %q but got a block", tag.name)
 			}
-			value := entry.Attribute.Value
+			entry := entry.(*Attribute)
+			value := entry.Value
 			// check enum before unmarshalling actual value
 			err := checkEnum(value, field, tag.enum)
 			if err != nil {
@@ -257,9 +260,9 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 			}
 			err = unmarshalValue(field.v, value, opt)
 			if err != nil {
-				pos := entry.Attribute.Pos
+				pos := entry.Pos
 				if value != nil {
-					pos = value.Pos
+					pos = value.Position()
 				}
 				return participle.Wrapf(pos, err, "failed to unmarshal value")
 			}
@@ -268,19 +271,19 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 
 	if !opt.allowExtra && len(seen) > 0 {
 		need := make([]string, 0, len(seen))
-		var pos *lexer.Position
+		var pos lexer.Position
 		for key, entry := range seen {
-			if pos == nil {
-				pos = &entry.Pos
+			if pos.Column == 0 {
+				pos = entry.Position()
 			}
 			need = append(need, strconv.Quote(key))
 		}
-		return participle.Errorf(*pos, "found extra fields %s", strings.Join(need, ", "))
+		return participle.Errorf(pos, "found extra fields %s", strings.Join(need, ", "))
 	}
 	return nil
 }
 
-func checkEnum(v *Value, f field, enum string) error {
+func checkEnum(v Value, f field, enum string) error {
 	if enum == "" || v == nil {
 		return nil
 	}
@@ -351,79 +354,84 @@ func unmarshalBlock(v reflect.Value, block *Block, opt *marshalState) error {
 	return unmarshalEntries(v, block.Body, opt)
 }
 
-func unmarshalValue(rv reflect.Value, v *Value, opt *marshalState) error {
+func unmarshalValue(rv reflect.Value, v Value, opt *marshalState) error {
 	switch rv.Kind() {
 	case reflect.String:
-		switch {
-		case v.Str != nil:
-			rv.SetString(*v.Str)
-		case v.Type != nil:
-			rv.SetString(*v.Type)
-		case v.HeredocDelimiter != "":
+		switch v := v.(type) {
+		case *String:
+			rv.SetString(v.Str)
+		case *Type:
+			rv.SetString(v.Type)
+		case *Heredoc:
 			rv.SetString(v.GetHeredoc())
 		default:
-			return participle.Errorf(v.Pos, "expected a type or string but got %s", v)
+			return participle.Errorf(v.Position(), "expected a type or string but got %s", v)
 		}
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if v.Number == nil {
-			return participle.Errorf(v.Pos, "expected a number but got %s", v)
+		number, ok := v.(*Number)
+		if !ok {
+			return participle.Errorf(v.Position(), "expected a number but got %s", v)
 		}
-		n, _ := v.Number.Int64()
+		n, _ := number.Float.Int64()
 		rv.SetInt(n)
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		if v.Number == nil {
-			return participle.Errorf(v.Pos, "expected a number but got %s", v)
+		number, ok := v.(*Number)
+		if !ok {
+			return participle.Errorf(v.Position(), "expected a number but got %s", v)
 		}
-		n, _ := v.Number.Uint64()
+		n, _ := number.Float.Uint64()
 		rv.SetUint(n)
 
 	case reflect.Float32, reflect.Float64:
-		if v.Number == nil {
-			return participle.Errorf(v.Pos, "expected a number but got %s", v)
+		number, ok := v.(*Number)
+		if !ok {
+			return participle.Errorf(v.Position(), "expected a number but got %s", v)
 		}
-		n, _ := v.Number.Float64()
+		n, _ := number.Float.Float64()
 		rv.SetFloat(n)
 
 	case reflect.Map:
-		if !v.HaveMap {
-			return participle.Errorf(v.Pos, "expected a map but got %s", v)
+		mapping, ok := v.(*Map)
+		if !ok {
+			return participle.Errorf(v.Position(), "expected a map but got %s", v)
 		}
 		t := rv.Type()
 		if t.Key().Kind() != reflect.String {
 			panic(fmt.Sprintf("map keys must be strings but we have %s", t.Key()))
 		}
 		rv.Set(reflect.MakeMap(t))
-		for _, entry := range v.Map {
+		for _, entry := range mapping.Entries {
 			key := reflect.New(t.Key()).Elem()
 			value := reflect.New(t.Elem()).Elem()
-			switch {
-			case entry.Key.Str != nil:
-				key.SetString(*entry.Key.Str)
-			case entry.Key.Type != nil:
-				key.SetString(*entry.Key.Type)
+			switch entryKey := entry.Key.(type) {
+			case *String:
+				key.SetString(entryKey.Str)
+			case *Type:
+				key.SetString(entryKey.Type)
 			default:
 				panic(fmt.Errorf("map key must be a string or type but is %s", entry.Key))
 			}
 			err := unmarshalValue(value, entry.Value, opt)
 			if err != nil {
-				return participle.Wrapf(entry.Value.Pos, err, "invalid map value")
+				return participle.Wrapf(entry.Value.Position(), err, "invalid map value")
 			}
 			rv.SetMapIndex(key, value)
 		}
 
 	case reflect.Slice:
-		if !v.HaveList {
-			return fmt.Errorf("expected a list but got %s", v)
+		list, ok := v.(*List)
+		if !ok {
+			return participle.Errorf(v.Position(), "expected a list but got %s", v)
 		}
 		t := rv.Type().Elem()
 		lv := reflect.MakeSlice(rv.Type(), 0, 4)
-		for _, entry := range v.List {
+		for _, entry := range list.List {
 			value := reflect.New(t).Elem()
 			err := unmarshalValue(value, entry, opt)
 			if err != nil {
-				return participle.Wrapf(entry.Pos, err, "invalid list element")
+				return participle.Wrapf(entry.Position(), err, "invalid list element")
 			}
 			lv = reflect.Append(lv, value)
 		}
@@ -437,21 +445,18 @@ func unmarshalValue(rv reflect.Value, v *Value, opt *marshalState) error {
 		return unmarshalValue(rv.Elem(), v, opt)
 
 	case reflect.Bool:
-		var ok bool
-		switch {
-		case v == nil:
+		var value bool
+		if v == nil {
 			if !opt.bareAttr {
 				return fmt.Errorf("expected = after attribute")
 			}
-			ok = true
-
-		case v.Bool == nil:
-			return participle.Errorf(v.Pos, "expected a bool but got %s", v)
-
-		default:
-			ok = bool(*v.Bool)
+			value = true
+		} else if b, ok := v.(*Bool); ok {
+			value = b.Bool
+		} else {
+			return participle.Errorf(v.Position(), "expected a bool but got %s", v)
 		}
-		rv.SetBool(ok)
+		rv.SetBool(value)
 
 	default:
 		panic(rv.Kind().String())
