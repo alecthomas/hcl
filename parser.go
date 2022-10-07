@@ -256,7 +256,7 @@ type Bool struct {
 	Pos    lexer.Position `parser:"" json:"-"`
 	Parent Node           `parser:"" json:"-"`
 
-	Bool bool `parser:"@'true' | 'false'" json:"bool,omitempty"`
+	Bool bool `parser:"@'true':Ident | 'false':Ident" json:"bool,omitempty"`
 }
 
 var _ Value = &Bool{}

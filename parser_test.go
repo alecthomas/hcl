@@ -185,6 +185,15 @@ EOF
 		{name: "SingleQuotedString",
 			hcl:      `a = 'hello\n"world"'`,
 			expected: hcl(attr("a", str("hello\n\"world\"")))},
+		{name: "BoolLiteralInMap",
+			hcl: `
+				map = {key: "true"}
+			`,
+			expected: &AST{
+				Entries: []Entry{
+					attr("map", hmap(hkv("key", str("true")))),
+				},
+			}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
