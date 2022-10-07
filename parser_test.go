@@ -139,6 +139,15 @@ EOF
 				},
 			},
 		},
+		{name: "BoolLiteralInMap",
+			hcl: `
+				map = {key: "true"}
+			`,
+			expected: &AST{
+				Entries: []*Entry{
+					attr("map", hmap(hkv("key", str("true")))),
+				},
+			}},
 		{name: "Block",
 			hcl: `
 				block {

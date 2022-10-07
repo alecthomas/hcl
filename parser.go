@@ -271,7 +271,7 @@ type Value struct {
 	Pos    lexer.Position `parser:"" json:"-"`
 	Parent Node           `parser:"" json:"-"`
 
-	Bool             *Bool       `parser:"(  @('true' | 'false')" json:"bool,omitempty"`
+	Bool             *Bool       `parser:"(  @('true':Ident | 'false':Ident)" json:"bool,omitempty"`
 	Number           *Number     `parser:" | @Number" json:"number,omitempty"`
 	Type             *string     `parser:" | @('number':Ident | 'string':Ident | 'boolean':Ident)" json:"type,omitempty"`
 	Str              *string     `parser:" | @(String | Ident)" json:"str,omitempty"`
