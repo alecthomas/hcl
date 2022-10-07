@@ -209,7 +209,7 @@ func structToEntries(v reflect.Value, opt *marshalState) (entries []*Entry, labe
 				for _, block := range blocks {
 					entries = append(entries, &Entry{Block: block})
 				}
-			} else {
+			} else if opt.schema || field.v.Kind() != reflect.Ptr || !field.v.IsNil() {
 				block, err := valueToBlock(field.v, tag, opt)
 				if err != nil {
 					return nil, nil, err

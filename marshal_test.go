@@ -361,6 +361,13 @@ attr = "string"
 			`,
 			options: []MarshalOption{WithSchemaComments(true)},
 		},
+		{name: "DontMarshalOmittedBlock",
+			src: &struct {
+				HTML *struct {
+					URL string `hcl:"url"`
+				} `hcl:"html,block"`
+			}{},
+			expected: ``},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
