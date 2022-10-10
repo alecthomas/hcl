@@ -93,8 +93,7 @@ func TestMarshal(t *testing.T) {
 				Delay time.Duration `hcl:"delay,optional" default:"24h"`
 			}{},
 			expected: `
-// default: 24h
-delay = string // (optional)
+delay = string(optional default("24h"))
 `,
 			options: []MarshalOption{asSchema(true)},
 		},
@@ -103,8 +102,7 @@ delay = string // (optional)
 				Delay *time.Duration `hcl:"delay,optional" default:"24h"`
 			}{},
 			expected: `
-// default: 24h
-delay = string // (optional)
+delay = string(optional default("24h"))
 `,
 			options: []MarshalOption{asSchema(true)},
 		},

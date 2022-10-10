@@ -80,7 +80,7 @@ Tag                  | Description
 `block`              | Specifies that the value is to populated from a block.
 `label`              | Specifies that the value is to populated from a block label.
 `optional`           | As with attr, but the field is optional.
-`remain`             | Specifies that the value is to be populated from the remaining body after populating other fields. The field must be of type `[]*hcl.Entry`.
+`remain`             | Specifies that the value is to be populated from the remaining body after populating other fields. The field must be of type `[]hcl.Entry`.
 
 Additionally, a separate `help:""` tag can be specified to populate comment fields in the AST when serialising Go
 structures.

@@ -231,6 +231,9 @@ func hbool(b bool) Value {
 }
 
 func normaliseAST(hcl *AST) *AST {
+	if hcl == nil {
+		return nil
+	}
 	hcl.Pos = lexer.Position{}
 	normaliseEntries(hcl.Entries)
 	return hcl
@@ -249,6 +252,10 @@ func normaliseEntries(entries []Entry) {
 			entry.Parent = nil
 			val := entry.Value
 			normaliseValue(val)
+			normaliseValue(entry.Default)
+			for _, enum := range entry.Enum {
+				normaliseValue(enum)
+			}
 		}
 	}
 }
