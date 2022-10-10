@@ -243,6 +243,14 @@ func fieldToAttr(field field, tag tag, opt *marshalState) (*Attribute, error) {
 		Key:      tag.name,
 		Comments: tag.comments(opt),
 	}
+	if opt.schemaComments {
+		if tag.enum != "" {
+			attr.Comments = append(attr.Comments, fmt.Sprintf("enum: %s", tag.enum))
+		}
+		if tag.defaultValue != "" {
+			attr.Comments = append(attr.Comments, fmt.Sprintf("default: %s", tag.defaultValue))
+		}
+	}
 	var err error
 	if opt.schema {
 		attr.Value, err = attrSchema(field.v.Type())
@@ -578,12 +586,30 @@ func marshalEntries(w io.Writer, indent string, entries []Entry) error {
 func marshalAttribute(w io.Writer, indent string, attribute *Attribute) error {
 	marshalComments(w, indent, attribute.Comments)
 	fmt.Fprintf(w, "%s%s = ", indent, attribute.Key)
-	err := marshalValue(w, indent, attribute.Value)
+	vw := &strings.Builder{}
+	err := marshalValue(vw, indent, attribute.Value)
 	if err != nil {
 		return err
 	}
-	if attribute.Optional {
-		fmt.Fprint(w, " // (optional)")
+	constraints := []string{}
+	if _, ok := attribute.Value.(*Type); ok {
+		if attribute.Optional {
+			constraints = append(constraints, "optional")
+		}
+		if attribute.Default != nil {
+			constraints = append(constraints, fmt.Sprintf("default(%s)", attribute.Default))
+		}
+		if len(attribute.Enum) > 0 {
+			enum := []string{}
+			for _, v := range attribute.Enum {
+				enum = append(enum, v.String())
+			}
+			constraints = append(constraints, fmt.Sprintf("enum(%s)", strings.Join(enum, ", ")))
+		}
+	}
+	fmt.Fprint(w, vw)
+	if len(constraints) > 0 {
+		fmt.Fprintf(w, "(%s)", strings.Join(constraints, " "))
 	}
 	fmt.Fprintln(w)
 	return nil
@@ -615,6 +641,9 @@ func marshalBlock(w io.Writer, indent string, block *Block) error {
 	marshalComments(w, indent, block.Comments)
 	prefix := fmt.Sprintf("%s%s", indent, block.Name)
 	fmt.Fprint(w, prefix)
+	if block.Repeated {
+		fmt.Fprint(w, "(repeated)")
+	}
 	labelIndent := len(prefix)
 	size := labelIndent
 	for i, label := range block.Labels {
@@ -628,11 +657,7 @@ func marshalBlock(w io.Writer, indent string, block *Block) error {
 		}
 		fmt.Fprintf(w, "%s", text)
 	}
-	if block.Repeated {
-		fmt.Fprintln(w, " { // (repeated)")
-	} else {
-		fmt.Fprintln(w, " {")
-	}
+	fmt.Fprintln(w, " {")
 	err := marshalEntries(w, indent+"  ", block.Body)
 	if err != nil {
 		return err

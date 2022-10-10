@@ -1,7 +1,6 @@
 package hcl
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -48,7 +47,7 @@ type jsonTaggedSchema struct {
 const expectedSchema = `
 // A string field.
 str = string
-num = number // (optional)
+num = number(optional)
 bool = boolean
 list = [string]
 // A map.
@@ -62,173 +61,26 @@ block "name" {
 }
 
 // Repeated blocks.
-block_slice "label0" "label1" { // (repeated)
+block_slice(repeated) "label0" "label1" {
   attr = string
 }
 
-// default: def
-default_str = string // (optional)
-// enum: a,b,c
-enum_str = string
-`
-const expectedJSONSchema = `
-{
-  "entries": [
-    {
-      "attribute": {
-        "comments": [
-          "A string field."
-        ],
-        "key": "str",
-        "value": {
-          "type": "string"
-        }
-      }
-    },
-    {
-      "attribute": {
-        "key": "num",
-        "value": {
-          "type": "number"
-        },
-        "optional": true
-      }
-    },
-    {
-      "attribute": {
-        "key": "bool",
-        "value": {
-          "type": "boolean"
-        }
-      }
-    },
-    {
-      "attribute": {
-        "key": "list",
-        "value": {
-          "list": [
-            {
-              "type": "string"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "attribute": {
-        "comments": [
-          "A map."
-        ],
-        "key": "map",
-        "value": {
-          "map": [
-            {
-              "key": {
-                "type": "string"
-              },
-              "value": {
-                "type": "number"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "block": {
-        "comments": [
-          "A block."
-        ],
-        "name": "block",
-        "labels": [
-          "name"
-        ],
-        "body": [
-          {
-            "attribute": {
-              "key": "attr",
-              "value": {
-                "type": "string"
-              }
-            }
-          }
-        ]
-      }
-    },
-    {
-      "block": {
-        "comments": [
-          "Repeated blocks."
-        ],
-        "name": "block_slice",
-        "labels": [
-          "label0",
-          "label1"
-        ],
-        "body": [
-          {
-            "attribute": {
-              "key": "attr",
-              "value": {
-                "type": "string"
-              }
-            }
-          }
-        ],
-        "repeated": true
-      }
-    },
-    {
-      "attribute": {
-        "comments": [
-          "default: def"
-        ],
-        "key": "default_str",
-        "value": {
-          "type": "string"
-        },
-        "default": {
-          "str": "def"
-        },
-        "optional": true
-      }
-    },
-    {
-      "attribute": {
-        "comments": [
-          "enum: a,b,c"
-        ],
-        "key": "enum_str",
-        "value": {
-          "type": "string"
-        },
-        "enum": [
-          {
-            "str": "a"
-          },
-          {
-            "str": "b"
-          },
-          {
-            "str": "c"
-          }
-        ]
-      }
-    }
-  ],
-  "schema": true
-}
+default_str = string(optional default("def"))
+enum_str = string(enum("a", "b", "c"))
 `
 
 func TestSchema(t *testing.T) {
-	schema, err := Schema(&testSchema{})
+	expected, err := Schema(&testSchema{})
 	require.NoError(t, err)
-	data, err := MarshalAST(schema)
+	data, err := MarshalAST(expected)
 	require.NoError(t, err)
 	require.Equal(t, strings.TrimSpace(expectedSchema), strings.TrimSpace(string(data)))
-	data, err = json.MarshalIndent(schema, "", "  ")
+	actual, err := ParseBytes(data)
 	require.NoError(t, err)
-	require.Equal(t, strings.TrimSpace(expectedJSONSchema), strings.TrimSpace(string(data)))
+	normaliseAST(actual)
+	normaliseAST(expected)
+	expected.Schema = false
+	require.Equal(t, expected, actual)
 }
 
 func TestBlockSchema(t *testing.T) {
@@ -266,15 +118,15 @@ str = string
 
 config {
   key = string
-  value = string // (optional)
+  value = string(optional)
 }
 
 options {
   key = string
-  value = string // (optional)
+  value = string(optional)
 }
 
-refs { // (repeated)
+refs(repeated) {
   name = string
 }
     `
@@ -295,7 +147,7 @@ func TestRecursiveSchema(t *testing.T) {
 	require.Equal(t, `// Name of user.
 name = string
 // Age of user.
-age = number // (optional)
+age = number(optional)
 
 recursive {
   // (recursive)

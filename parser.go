@@ -50,11 +50,11 @@ func (e Entries) MarshalJSON() ([]byte, error) {
 
 // AST for HCL.
 type AST struct {
-	Pos lexer.Position `parser:"" json:"-"`
+	Pos lexer.Position `parser:""`
 
-	Entries          Entries  `parser:"@@*" json:"entries,omitempty"`
-	TrailingComments []string `parser:"@Comment*" json:"trailingComments,omitempty"`
-	Schema           bool     `parser:"" json:"schema,omitempty"`
+	Entries          Entries  `parser:"@@*"`
+	TrailingComments []string `parser:"@Comment*"`
+	Schema           bool     `parser:""`
 }
 
 func (a *AST) Detach() bool { return false }
@@ -107,22 +107,17 @@ var _ Entry = &RecursiveEntry{}
 
 // Attribute is a key=value attribute.
 type Attribute struct {
-	Pos    lexer.Position `parser:"" json:"-"`
-	Parent Node           `parser:"" json:"-"`
+	Pos    lexer.Position `parser:""`
+	Parent Node           `parser:""`
 
-	Comments []string `parser:"@Comment*" json:"comments,omitempty"`
+	Comments []string `parser:"@Comment*"`
 
-	Key   string `parser:"@Ident ( '='" json:"key"`
-	Value Value  `parser:"@@ )?" json:"value"`
+	Key   string `parser:"@Ident"`
+	Value Value  `parser:"( '=':Punct @@ )?"`
 
-	// This will be populated during unmarshalling.
-	Default Value `parser:"" json:"default,omitempty"`
-
-	// This will be parsed from the enum tag and will be helping the validation during unmarshalling
-	Enum []Value `parser:"" json:"enum,omitempty"`
-
-	// Set for schemas when the attribute is optional.
-	Optional bool `parser:"" json:"optional,omitempty"`
+	Default  Value   `parser:"( '(' ( (  'default' '(' @@ ')'"`
+	Enum     []Value `parser:"         | 'enum' '(' @@ (',' @@)* ')'"`
+	Optional bool    `parser:"         | @'optional' ) )+ ')' )?"`
 }
 
 var _ Entry = &Attribute{}
@@ -153,19 +148,17 @@ func (a *Attribute) Clone() Entry {
 
 // Block represents am optionally labelled HCL block.
 type Block struct {
-	Pos    lexer.Position `parser:"" json:"-"`
-	Parent Node           `parser:"" json:"-"`
+	Pos    lexer.Position `parser:""`
+	Parent Node           `parser:""`
 
-	Comments []string `parser:"@Comment*" json:"comments,omitempty"`
+	Comments []string `parser:"@Comment*"`
 
-	Name   string   `parser:"@Ident" json:"name"`
-	Labels []string `parser:"@( Ident | String )*" json:"labels,omitempty"`
-	Body   Entries  `parser:"'{' @@*" json:"body"`
+	Name     string   `parser:"@Ident"`
+	Repeated bool     `parser:"( '(' @'repeated' ')' )?"`
+	Labels   []string `parser:"@( Ident | String )*"`
+	Body     Entries  `parser:"'{' @@*"`
 
-	TrailingComments []string `parser:"@Comment* '}'" json:"trailingComments,omitempty"`
-
-	// The block can be repeated. This is surfaced in schemas.
-	Repeated bool `parser:"" json:"repeated,omitempty"`
+	TrailingComments []string `parser:"@Comment* '}'"`
 }
 
 var _ Entry = &Block{}
@@ -209,13 +202,13 @@ func (b *Block) Clone() Entry {
 
 // MapEntry represents a key+value in a map.
 type MapEntry struct {
-	Pos    lexer.Position `parser:"" json:"-"`
-	Parent Node           `parser:"" json:"-"`
+	Pos    lexer.Position `parser:""`
+	Parent Node           `parser:""`
 
-	Comments []string `parser:"@Comment*" json:"comments,omitempty"`
+	Comments []string `parser:"@Comment*"`
 
-	Key   Value `parser:"@@ ':'" json:"key"`
-	Value Value `parser:"@@" json:"value"`
+	Key   Value `parser:"@@ ':'"`
+	Value Value `parser:"@@"`
 }
 
 func (e *MapEntry) Detach() bool {
@@ -253,10 +246,10 @@ func (e *MapEntry) Clone() *MapEntry {
 
 // Bool represents a parsed boolean value.
 type Bool struct {
-	Pos    lexer.Position `parser:"" json:"-"`
-	Parent Node           `parser:"" json:"-"`
+	Pos    lexer.Position `parser:""`
+	Parent Node           `parser:""`
 
-	Bool bool `parser:"@'true':Ident | 'false':Ident" json:"bool,omitempty"`
+	Bool bool `parser:"@'true':Ident | 'false':Ident"`
 }
 
 var _ Value = &Bool{}
@@ -274,10 +267,10 @@ var needsOctalPrefix = regexp.MustCompile(`^0\d+$`)
 
 // Number of arbitrary precision.
 type Number struct {
-	Pos    lexer.Position `parser:"" json:"-"`
-	Parent Node           `parser:"" json:"-"`
+	Pos    lexer.Position `parser:""`
+	Parent Node           `parser:""`
 
-	Float *big.Float `parser:"@Number" json:"number,omitempty"`
+	Float *big.Float `parser:"@Number"`
 }
 
 var _ Value = &Number{}
@@ -319,29 +312,67 @@ type Value interface {
 	Node
 }
 
-// Type represents a scalar type name of an attribute.
+// Type of a Value.
 type Type struct {
-	Pos    lexer.Position `parser:"" json:"-"`
-	Parent Node           `parser:"" json:"-"`
+	Pos    lexer.Position `parser:""`
+	Parent Node           `parser:""`
 
-	Type string `parser:"@('number':Ident | 'string':Ident | 'boolean':Ident)" json:"type,omitempty"`
+	Ident string `parser:"@('string':Ident | 'number':Ident | 'boolean':Ident)"`
 }
 
 var _ Value = &Type{}
 
 func (t *Type) value()                      {}
 func (t *Type) Clone() Value                { clone := *t; return &clone }
-func (t *Type) String() string              { return t.Type }
+func (t *Type) String() string              { return t.Ident }
 func (t *Type) Detach() bool                { return false }
 func (t *Type) Position() lexer.Position    { return t.Pos }
 func (t *Type) children() (children []Node) { return nil }
 
+// Call represents a function call.
+type Call struct {
+	Pos    lexer.Position `parser:""`
+	Parent Node           `parser:""`
+
+	Args []Value `parser:"'(' @@ ( ',' @@ )* ')'"`
+}
+
+var _ Node = &Call{}
+
+func (f *Call) Clone() *Call {
+	if f == nil {
+		return nil
+	}
+	clone := *f
+	clone.Args = make([]Value, len(f.Args))
+	for i, arg := range clone.Args {
+		clone.Args[i] = arg.Clone()
+	}
+	return &clone
+}
+func (f *Call) String() string {
+	args := make([]string, 0, len(f.Args))
+	for i, arg := range f.Args {
+		args[i] = arg.String()
+	}
+	return fmt.Sprintf("(%s)", strings.Join(args, ", "))
+}
+func (f *Call) Detach() bool             { return false }
+func (f *Call) Position() lexer.Position { return f.Pos }
+func (f *Call) children() (children []Node) {
+	out := make([]Node, len(f.Args))
+	for i, arg := range f.Args {
+		out[i] = arg
+	}
+	return out
+}
+
 // String literal.
 type String struct {
-	Pos    lexer.Position `parser:"" json:"-"`
-	Parent Node           `parser:"" json:"-"`
+	Pos    lexer.Position `parser:""`
+	Parent Node           `parser:""`
 
-	Str string `parser:"@(String | Ident)" json:"str,omitempty"`
+	Str string `parser:"@(String | Ident)"`
 }
 
 var _ Value = &String{}
@@ -355,11 +386,11 @@ func (s *String) value()                      {}
 
 // Heredoc represents a heredoc string.
 type Heredoc struct {
-	Pos    lexer.Position `parser:"" json:"-"`
-	Parent Node           `parser:"" json:"-"`
+	Pos    lexer.Position `parser:""`
+	Parent Node           `parser:""`
 
-	Delimiter string `parser:"(@Heredoc" json:"heredocDelimiter,omitempty"`
-	Doc       string `parser:" @(Body | EOL)* End)" json:"heredoc,omitempty"`
+	Delimiter string `parser:"(@Heredoc"`
+	Doc       string `parser:" @(Body | EOL)* End)"`
 }
 
 var _ Value = &Heredoc{}
@@ -386,10 +417,10 @@ func (h *Heredoc) GetHeredoc() string {
 
 // A List of values.
 type List struct {
-	Pos    lexer.Position `parser:"" json:"-"`
-	Parent Node           `parser:"" json:"-"`
+	Pos    lexer.Position `parser:""`
+	Parent Node           `parser:""`
 
-	List []Value `parser:"( '[' ( @@ ( ',' @@ )* )? ','? ']' )" json:"list,omitempty"`
+	List []Value `parser:"( '[' ( @@ ( ',' @@ )* )? ','? ']' )"`
 }
 
 func (l *List) Clone() Value {
@@ -422,10 +453,10 @@ func (l *List) value()                      {}
 
 // A Map of key to value.
 type Map struct {
-	Pos    lexer.Position `parser:"" json:"-"`
-	Parent Node           `parser:"" json:"-"`
+	Pos    lexer.Position `parser:""`
+	Parent Node           `parser:""`
 
-	Entries []*MapEntry `parser:"( '{' ( @@ ( ',' @@ )* ','? )? '}' )" json:"map,omitempty"`
+	Entries []*MapEntry `parser:"( '{' ( @@ ( ',' @@ )* ','? )? '}' )"`
 }
 
 func (m *Map) Clone() Value {
@@ -467,7 +498,7 @@ var (
 			{"Number", `^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?`, nil},
 			{"Heredoc", `<<[-]?(\w+\b)`, lexer.Push("Heredoc")},
 			{"String", `"(\\\d\d\d|\\.|[^"])*"|'(\\\d\d\d|\\.|[^'])*'`, nil},
-			{"Punct", `[][{}=:,]`, nil},
+			{"Punct", `[][*?{}=:,()|]`, nil},
 			{"Comment", `(?:(?://|#)[^\n]*)|/\*.*?\*/`, nil},
 			{"Whitespace", `\s+`, nil},
 		},

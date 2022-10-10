@@ -361,7 +361,7 @@ func unmarshalValue(rv reflect.Value, v Value, opt *marshalState) error {
 		case *String:
 			rv.SetString(v.Str)
 		case *Type:
-			rv.SetString(v.Type)
+			rv.SetString(v.Ident)
 		case *Heredoc:
 			rv.SetString(v.GetHeredoc())
 		default:
@@ -409,7 +409,7 @@ func unmarshalValue(rv reflect.Value, v Value, opt *marshalState) error {
 			case *String:
 				key.SetString(entryKey.Str)
 			case *Type:
-				key.SetString(entryKey.Type)
+				key.SetString(entryKey.Ident)
 			default:
 				panic(fmt.Errorf("map key must be a string or type but is %s", entry.Key))
 			}
@@ -513,12 +513,6 @@ func (t tag) comments(opts *marshalState) []string {
 		var lines []string
 		if t.help != "" {
 			lines = append(lines, strings.Split(t.help, "\n")...)
-		}
-		if t.enum != "" {
-			lines = append(lines, "enum: "+t.enum)
-		}
-		if t.defaultValue != "" {
-			lines = append(lines, "default: "+t.defaultValue)
 		}
 		return lines
 	}

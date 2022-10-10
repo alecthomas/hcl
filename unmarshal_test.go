@@ -399,7 +399,7 @@ nested {
   name = "your"
 }
 message1 = "wonderful"
-message2 = world
+message2 = "world"
 `,
 			dest: remainStruct{
 				Name: "hello",
