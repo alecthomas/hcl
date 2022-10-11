@@ -60,11 +60,11 @@ var (
 
 func attrSchema(t reflect.Type) (Value, error) {
 	if t == durationType || t == timeType || typeImplements(t, textMarshalerInterface) || typeImplements(t, jsonMarshalerInterface) {
-		return &Type{Ident: strType}, nil
+		return &Type{Type: strType}, nil
 	}
 	switch t.Kind() {
 	case reflect.String:
-		return &Type{Ident: strType}, nil
+		return &Type{Type: strType}, nil
 
 	case reflect.Slice:
 		el, err := attrSchema(t.Elem())
@@ -78,15 +78,15 @@ func attrSchema(t reflect.Type) (Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &Map{Entries: []*MapEntry{{Key: &Type{Ident: strType}, Value: el}}}, nil
+		return &Map{Entries: []*MapEntry{{Key: &Type{Type: strType}, Value: el}}}, nil
 
 	case reflect.Float32, reflect.Float64,
 		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return &Type{Ident: numType}, nil
+		return &Type{Type: numType}, nil
 
 	case reflect.Bool:
-		return &Type{Ident: boolType}, nil
+		return &Type{Type: boolType}, nil
 
 	case reflect.Struct:
 		panic("struct " + t.String() + " used as attribute, is it missing a \"block\" tag?")

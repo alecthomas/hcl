@@ -317,14 +317,14 @@ type Type struct {
 	Pos    lexer.Position `parser:""`
 	Parent Node           `parser:""`
 
-	Ident string `parser:"@('string':Ident | 'number':Ident | 'boolean':Ident)"`
+	Type string `parser:"@('string':Ident | 'number':Ident | 'boolean':Ident)"`
 }
 
 var _ Value = &Type{}
 
 func (t *Type) value()                      {}
 func (t *Type) Clone() Value                { clone := *t; return &clone }
-func (t *Type) String() string              { return t.Ident }
+func (t *Type) String() string              { return t.Type }
 func (t *Type) Detach() bool                { return false }
 func (t *Type) Position() lexer.Position    { return t.Pos }
 func (t *Type) children() (children []Node) { return nil }

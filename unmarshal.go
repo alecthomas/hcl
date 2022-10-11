@@ -361,7 +361,7 @@ func unmarshalValue(rv reflect.Value, v Value, opt *marshalState) error {
 		case *String:
 			rv.SetString(v.Str)
 		case *Type:
-			rv.SetString(v.Ident)
+			rv.SetString(v.Type)
 		case *Heredoc:
 			rv.SetString(v.GetHeredoc())
 		default:
@@ -409,7 +409,7 @@ func unmarshalValue(rv reflect.Value, v Value, opt *marshalState) error {
 			case *String:
 				key.SetString(entryKey.Str)
 			case *Type:
-				key.SetString(entryKey.Ident)
+				key.SetString(entryKey.Type)
 			default:
 				panic(fmt.Errorf("map key must be a string or type but is %s", entry.Key))
 			}
