@@ -592,7 +592,7 @@ func marshalAttribute(w io.Writer, indent string, attribute *Attribute) error {
 		return err
 	}
 	constraints := []string{}
-	if _, ok := attribute.Value.(*Type); ok {
+	if isType(attribute.Value) {
 		if attribute.Optional {
 			constraints = append(constraints, "optional")
 		}
@@ -613,6 +613,22 @@ func marshalAttribute(w io.Writer, indent string, attribute *Attribute) error {
 	}
 	fmt.Fprintln(w)
 	return nil
+}
+
+func isType(value Value) bool {
+	switch value := value.(type) {
+	case *Type:
+		return true
+
+	case *List:
+		return len(value.List) == 1 && isType(value.List[0])
+
+	case *Map:
+		return len(value.Entries) == 1 && isType(value.Entries[0].Value)
+
+	default:
+		return false
+	}
 }
 
 func marshalValue(w io.Writer, indent string, value Value) error {
