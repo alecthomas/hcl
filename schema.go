@@ -59,7 +59,7 @@ var (
 )
 
 func attrSchema(t reflect.Type) (Value, error) {
-	if t == durationType || t == timeType || typeImplements(t, textMarshalerInterface) || typeImplements(t, jsonMarshalerInterface) {
+	if t == durationType || t == timeType || typeImplements(t, textUnmarshalerInterface) || typeImplements(t, jsonUnmarshalerInterface) {
 		return &Type{Type: strType}, nil
 	}
 	switch t.Kind() {
