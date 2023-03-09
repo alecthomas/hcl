@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/big"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -653,6 +654,8 @@ func marshalMap(w io.Writer, indent string, entries []*MapEntry) error {
 	return nil
 }
 
+var needsQuote = regexp.MustCompile(`[^\w-]`)
+
 func marshalBlock(w io.Writer, indent string, block *Block) error {
 	marshalComments(w, indent, block.Comments)
 	prefix := fmt.Sprintf("%s%s", indent, block.Name)
@@ -663,7 +666,10 @@ func marshalBlock(w io.Writer, indent string, block *Block) error {
 	labelIndent := len(prefix)
 	size := labelIndent
 	for i, label := range block.Labels {
-		text := strconv.Quote(label)
+		text := label
+		if needsQuote.MatchString(label) {
+			text = strconv.Quote(label)
+		}
 		size += len(text)
 		if i > 0 && size+2 >= 80 {
 			size = labelIndent

@@ -56,12 +56,12 @@ map = {
 }
 
 // A block.
-block "name" {
+block name {
   attr = string
 }
 
 // Repeated blocks.
-block_slice(repeated) "label0" "label1" {
+block_slice(repeated) label0 label1 {
   attr = string
 }
 
@@ -94,7 +94,7 @@ func TestBlockSchema(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t,
 		strings.TrimSpace(`
-block "label" {
+block label {
   attr = string
 }
 `),

@@ -115,7 +115,7 @@ delay = string(optional default("24h"))
 				},
 			},
 			expected: `
-block "multiple" "labels" "varargs" {
+block multiple labels varargs {
 }
 `,
 		},
@@ -124,12 +124,12 @@ block "multiple" "labels" "varargs" {
 				Block varArgLabelBlock `hcl:"block,block"`
 			}{
 				Block: varArgLabelBlock{
-					Path: []string{"multiple", "labels", "varargs", "really", "really", "really", "really", "long", "labels", "that", "are", "really", "long"},
+					Path: []string{"multiple", "labels", "var-args", "really", "really is", "really", "really", "long", "labels", "that", "are", "really", "long"},
 				},
 			},
 			expected: `
-block "multiple" "labels" "varargs" "really" "really" "really" "really" "long"
-      "labels" "that" "are" "really" "long" {
+block multiple labels var-args really "really is" really really long labels that are
+      really long {
 }
 `,
 		},
