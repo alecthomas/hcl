@@ -663,20 +663,12 @@ func marshalBlock(w io.Writer, indent string, block *Block) error {
 	if block.Repeated {
 		fmt.Fprint(w, "(repeated)")
 	}
-	labelIndent := len(prefix)
-	size := labelIndent
-	for i, label := range block.Labels {
+	for _, label := range block.Labels {
 		text := label
 		if needsQuote.MatchString(label) {
 			text = strconv.Quote(label)
 		}
-		size += len(text)
-		if i > 0 && size+2 >= 80 {
-			size = labelIndent
-			fmt.Fprintf(w, "\n %s", strings.Repeat(" ", labelIndent))
-		} else {
-			fmt.Fprintf(w, " ")
-		}
+		fmt.Fprintf(w, " ")
 		fmt.Fprintf(w, "%s", text)
 	}
 	fmt.Fprintln(w, " {")

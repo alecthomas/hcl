@@ -128,8 +128,7 @@ block multiple labels varargs {
 				},
 			},
 			expected: `
-block multiple labels var-args really "really is" really really long labels that are
-      really long {
+block multiple labels var-args really "really is" really really long labels that are really long {
 }
 `,
 		},
