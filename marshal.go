@@ -154,6 +154,9 @@ func marshalToAST(v interface{}, opt *marshalState) (*AST, error) {
 }
 
 func structToEntries(v reflect.Value, opt *marshalState) (entries []Entry, labels []string, err error) {
+	if v.Kind() == reflect.Interface {
+		v = v.Elem()
+	}
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
 			if !opt.schema {
@@ -417,6 +420,9 @@ func valueFromTag(f field, defaultValue string) (Value, error) {
 }
 
 func valueToValue(v reflect.Value, opt *marshalState) (Value, error) {
+	if v.Kind() == reflect.Interface {
+		v = v.Elem()
+	}
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
