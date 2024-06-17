@@ -994,3 +994,98 @@ b {}
 	}
 	require.Equal(t, expected, blocks)
 }
+
+type nonemptyInterface interface {
+	Hello()
+}
+
+func TestUnmarshallInterfaces(t *testing.T) {
+	tests := []test{
+		{
+			name: "basic str",
+			hcl:  "f = \"hello\"",
+			dest: struct {
+				IfaceStr any `hcl:"f"`
+			}{
+				IfaceStr: "hello",
+			},
+		},
+		{
+			name: "heterogeneous simple vals",
+			hcl:  "a = 123\nb = true\nc = 1.2\n",
+			dest: struct {
+				A interface{} `hcl:"a"`
+				B interface{} `hcl:"b"`
+				C interface{} `hcl:"c"`
+			}{
+				A: 123,
+				B: true,
+				C: 1.2,
+			},
+		},
+		{
+			name: "any to map",
+			hcl:  `ifaceval = {a: "hello", b: "bye"}`,
+			dest: struct {
+				Ifaceval interface{} `hcl:"ifaceval"`
+			}{
+				Ifaceval: map[string]interface{}{
+					"a": "hello",
+					"b": "bye",
+				},
+			},
+		},
+		{
+			name: "any to nested map",
+			hcl:  `ifaceval = {a: "hello", b: {c: "inner"} }`,
+			dest: struct {
+				Ifaceval interface{} `hcl:"ifaceval"`
+			}{
+				Ifaceval: map[string]interface{}{
+					"a": "hello",
+					"b": map[string]interface{}{
+						"c": "inner",
+					},
+				},
+			},
+		},
+		{
+			name: "slice to interface{}",
+			hcl:  `ifaveval = ["a", "b", "c"]`,
+			dest: struct {
+				Ifaceval interface{} `hcl:"ifaveval"`
+			}{
+				Ifaceval: []interface{}{"a", "b", "c"},
+			},
+		},
+		{
+			name: "nonempty interface fails",
+			hcl:  `ifaceval = {a: "hello", b: "bye"}`,
+			dest: struct {
+				Ifaceval nonemptyInterface `hcl:"ifaceval"`
+			}{
+				Ifaceval: nil,
+			},
+			fail: "1:12: failed to unmarshal value: invalid interface target: expected any/interface{} but got hcl.nonemptyInterface",
+		},
+		{
+			name: "block",
+			hcl: `s = "asdf"
+                  block {
+                    hello = "test"
+                  }`,
+			dest: struct {
+				S     string      `hcl:"s"`
+				Block interface{} `hcl:"block,optional"`
+			}{
+				S: "asdf",
+				Block: map[string]interface{}{
+					"hello": "test",
+				},
+			},
+			// blocks shouldn't implicitly work as they should to be unmarshalled into a struct
+			fail: "2:19: expected an attribute for \"block\" but got a block",
+		},
+	}
+	runTests(t, tests)
+}

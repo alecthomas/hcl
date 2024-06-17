@@ -366,6 +366,21 @@ attr = "string"
 				} `hcl:"html,block"`
 			}{},
 			expected: ``},
+		{name: "MarshallStructViaInterface",
+			src: &struct {
+				IfaceBlock interface{} `hcl:"outer,block"`
+			}{
+				IfaceBlock: &struct {
+					Attr string `hcl:"attr"`
+				}{
+					Attr: "some string",
+				},
+			},
+			expected: `outer {
+  attr = "some string"
+}
+`,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
