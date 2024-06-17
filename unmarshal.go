@@ -458,8 +458,53 @@ func unmarshalValue(rv reflect.Value, v Value, opt *marshalState) error {
 		}
 		rv.SetBool(value)
 
+	case reflect.Interface:
+		err := unmarshalAny(rv, v, opt)
+		if err != nil {
+			return participle.Wrapf(v.Position(), err, "invalid interface target")
+		}
+
 	default:
 		panic(rv.Kind().String())
+	}
+	return nil
+}
+
+func unmarshalAny(rv reflect.Value, v Value, state *marshalState) error {
+	if rv.Kind() != reflect.Interface {
+		return fmt.Errorf("can only unmarshall any to an interface{}/any receiver")
+	}
+	if rv.NumMethod() != 0 {
+		return participle.Errorf(v.Position(), "expected any/interface{} but got %s", rv.Type().String())
+	}
+
+	var empty any
+	switch y := v.(type) {
+	case *Number:
+		f, _ := y.Float.Float64()
+		rv.Set(reflect.ValueOf(f))
+	case *Bool:
+		rv.Set(reflect.ValueOf(y.Bool))
+	case *String:
+		rv.Set(reflect.ValueOf(y.Str))
+	case *Map:
+		receivingMap := reflect.MapOf(reflect.TypeOf(""), reflect.TypeOf(&empty).Elem())
+		mapPtr := reflect.New(receivingMap).Elem()
+		err := unmarshalValue(mapPtr, v, state)
+		if err != nil {
+			return participle.Wrapf(v.Position(), err, "bad map")
+		}
+		rv.Set(mapPtr)
+	case *List:
+		receivingSlice := reflect.SliceOf(reflect.TypeOf(&empty).Elem())
+		slicePtr := reflect.New(receivingSlice).Elem()
+		err := unmarshalValue(slicePtr, v, state)
+		if err != nil {
+			return participle.Wrapf(v.Position(), err, "bad slice")
+		}
+		rv.Set(slicePtr)
+	default:
+		return participle.Errorf(v.Position(), "can't unmarshall %s to any/interface{}", v.String())
 	}
 	return nil
 }
