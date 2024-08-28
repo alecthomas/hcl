@@ -83,7 +83,7 @@ func WithSchemaComments(v bool) MarshalOption {
 	}
 }
 
-func asSchema(schema bool) MarshalOption {
+func asSchema(schema bool) MarshalOption { //nolint:unparam
 	return func(options *marshalState) {
 		options.schema = schema
 	}
@@ -292,7 +292,7 @@ func enumValuesFromTag(f field, enum string) ([]*Value, error) {
 
 func valueFromTag(f field, defaultValue string) (*Value, error) {
 	if defaultValue == "" {
-		return nil, nil // nolint: nilnil
+		return nil, nil //nolint: nilnil
 	}
 
 	k := f.v.Kind()
@@ -564,22 +564,28 @@ func marshalEntries(w io.Writer, indent string, entries []*Entry) error {
 	for i, entry := range entries {
 		if block := entry.Block; block != nil {
 			if i > 0 {
-				fmt.Fprintln(w)
+				if _, err := fmt.Fprintln(w); err != nil {
+					return err
+				}
 			}
 			if err := marshalBlock(w, indent, block); err != nil {
 				return err
 			}
 			prevAttr = false
-		} else if attr := entry.Attribute; attr != nil { // nolint: gocritic
+		} else if attr := entry.Attribute; attr != nil { //nolint: gocritic
 			if !prevAttr {
-				fmt.Fprintln(w)
+				if _, err := fmt.Fprintln(w); err != nil {
+					return err
+				}
 			}
 			if err := marshalAttribute(w, indent, attr); err != nil {
 				return err
 			}
 			prevAttr = true
 		} else if entry.RecursiveSchema {
-			fmt.Fprintf(w, "%s// (recursive)\n", indent)
+			if _, err := fmt.Fprintf(w, "%s// (recursive)\n", indent); err != nil {
+				return err
+			}
 		} else {
 			panic("??")
 		}
@@ -597,7 +603,9 @@ func marshalAttribute(w io.Writer, indent string, attribute *Attribute) error {
 	if attribute.Optional {
 		fmt.Fprint(w, " // (optional)")
 	}
-	fmt.Fprintln(w)
+	if _, err := fmt.Fprintln(w); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -605,28 +613,40 @@ func marshalValue(w io.Writer, indent string, value *Value) error {
 	if value.HaveMap {
 		return marshalMap(w, indent+"  ", value.Map)
 	}
-	fmt.Fprintf(w, "%s", value)
+	if _, err := fmt.Fprintf(w, "%s", value); err != nil {
+		return err
+	}
 	return nil
 }
 
 func marshalMap(w io.Writer, indent string, entries []*MapEntry) error {
-	fmt.Fprintln(w, "{")
+	if _, err := fmt.Fprintln(w, "{"); err != nil {
+		return err
+	}
 	for _, entry := range entries {
 		marshalComments(w, indent, entry.Comments)
-		fmt.Fprintf(w, "%s%s: ", indent, entry.Key)
+		if _, err := fmt.Fprintf(w, "%s%s: ", indent, entry.Key); err != nil {
+			return err
+		}
 		if err := marshalValue(w, indent+"  ", entry.Value); err != nil {
 			return err
 		}
-		fmt.Fprintln(w, ",")
+		if _, err := fmt.Fprintln(w, ","); err != nil {
+			return err
+		}
 	}
-	fmt.Fprintf(w, "%s}", indent[:len(indent)-2])
+	if _, err := fmt.Fprintf(w, "%s}", indent[:len(indent)-2]); err != nil {
+		return err
+	}
 	return nil
 }
 
 func marshalBlock(w io.Writer, indent string, block *Block) error {
 	marshalComments(w, indent, block.Comments)
 	prefix := fmt.Sprintf("%s%s", indent, block.Name)
-	fmt.Fprint(w, prefix)
+	if _, err := fmt.Fprint(w, prefix); err != nil {
+		return err
+	}
 	labelIndent := len(prefix)
 	size := labelIndent
 	for i, label := range block.Labels {
@@ -641,9 +661,13 @@ func marshalBlock(w io.Writer, indent string, block *Block) error {
 		fmt.Fprintf(w, "%s", text)
 	}
 	if block.Repeated {
-		fmt.Fprintln(w, " { // (repeated)")
+		if _, err := fmt.Fprintln(w, " { // (repeated)"); err != nil {
+			return err
+		}
 	} else {
-		fmt.Fprintln(w, " {")
+		if _, err := fmt.Fprintln(w, " {"); err != nil {
+			return err
+		}
 	}
 	err := marshalEntries(w, indent+"  ", block.Body)
 	if err != nil {

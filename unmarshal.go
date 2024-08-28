@@ -95,7 +95,7 @@ func unmarshalEntries(v reflect.Value, entries []*Entry, opt *marshalState) erro
 	}
 	// Apply HCL entries to our fields.
 	for _, field := range fields {
-		tag := field.tag // nolint: govet
+		tag := field.tag //nolint: govet
 		switch {
 		case tag.name == "":
 			continue
@@ -320,7 +320,7 @@ func unmarshalBlock(v reflect.Value, block *Block, opt *marshalState) error {
 	}
 	labels := block.Labels
 	for _, field := range fields {
-		tag := field.tag // nolint: govet
+		tag := field.tag //nolint: govet
 		if tag.name == "" || !tag.label {
 			continue
 		}
@@ -481,7 +481,7 @@ func flattenFields(v reflect.Value, opt *marshalState) ([]field, error) {
 			}
 			out = append(out, sub...)
 		} else {
-			tag := parseTag(v.Type(), ft, opt) // nolint: govet
+			tag := parseTag(v.Type(), ft, opt) //nolint: govet
 			out = append(out, field{ft, f, tag})
 		}
 	}

@@ -153,7 +153,7 @@ func (w *jsonVisitor) writeValue(node *Value) error {
 		fmt.Fprintf(w, "%q", *node.Type)
 
 	default:
-		panic(repr.String(node, repr.Hide(lexer.Position{})))
+		panic(repr.String(node, repr.Hide[lexer.Position]()))
 	}
 	return nil
 }

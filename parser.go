@@ -246,7 +246,7 @@ func (e *MapEntry) Clone() *MapEntry {
 // Bool represents a parsed boolean value.
 type Bool bool
 
-func (b *Bool) Capture(values []string) error { *b = values[0] == "true"; return nil } // nolint: golint
+func (b *Bool) Capture(values []string) error { *b = values[0] == "true"; return nil } //nolint: golint
 
 var needsOctalPrefix = regexp.MustCompile(`^0\d+$`)
 
@@ -356,7 +356,7 @@ func (v *Value) String() string {
 		return fmt.Sprintf("%s", *v.Type)
 
 	default:
-		panic(repr.String(v, repr.Hide(lexer.Position{})))
+		panic(repr.String(v, repr.Hide[lexer.Position]()))
 	}
 }
 

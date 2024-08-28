@@ -40,6 +40,11 @@ linters:
     - forcetypeassert
     - maintidx
     - revive
+    - tagalign
+    - depguard
+    - dupword
+    - mnd
+    - perfsprint
 
 linters-settings:
   govet:
@@ -69,3 +74,4 @@ issues:
     - 'bad syntax for struct tag key'
     - 'bad syntax for struct tag pair'
     - '^ST1012'
+    - 'struct literal uses unkeyed fields'
