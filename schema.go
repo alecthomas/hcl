@@ -74,11 +74,15 @@ func attrSchema(t reflect.Type) (Value, error) {
 		return &List{List: []Value{el}}, nil
 
 	case reflect.Map:
-		el, err := attrSchema(t.Elem())
+		keyType, err := attrSchema(t.Key())
 		if err != nil {
 			return nil, err
 		}
-		return &Map{Entries: []*MapEntry{{Key: &Type{Type: strType}, Value: el}}}, nil
+		valType, err := attrSchema(t.Elem())
+		if err != nil {
+			return nil, err
+		}
+		return &Map{Entries: []*MapEntry{{Key: keyType, Value: valType}}}, nil
 
 	case reflect.Float32, reflect.Float64,
 		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
