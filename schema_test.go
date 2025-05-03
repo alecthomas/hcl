@@ -13,6 +13,8 @@ type testSchema struct {
 	Bool  bool           `hcl:"bool"`
 	List  []string       `hcl:"list"`
 	Map   map[string]int `hcl:"map" help:"A map."`
+	Map2  map[int]string `hcl:"map2" help:"Another map."`
+	Nope  string         `hcl:"-" help:"An ignored field."`
 	Block struct {
 		Name string  `hcl:"name,label"`
 		Attr *string `hcl:"attr"`
@@ -53,6 +55,10 @@ list = [string]
 // A map.
 map = {
   string: number,
+}
+// Another map.
+map2 = {
+  number: string,
 }
 
 // A block.
