@@ -195,15 +195,20 @@ bool = true
 		{name: "ListsAndMaps",
 			src: &struct {
 				Map  map[string]string `hcl:"map"`
+				Map2 map[int]string    `hcl:"map2"`
 				List []int             `hcl:"list"`
 			}{
 				Map:  map[string]string{"hello": "world", "waz": "foo"},
+				Map2: map[int]string{5: "world"},
 				List: []int{1, 2, 3},
 			},
 			expected: `
 map = {
   "hello": "world",
   "waz": "foo",
+}
+map2 = {
+  5: "world",
 }
 list = [1, 2, 3]
 `,

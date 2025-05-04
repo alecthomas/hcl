@@ -476,13 +476,16 @@ func valueToValue(v reflect.Value, opt *marshalState) (Value, error) {
 			return sorted[i].String() < sorted[j].String()
 		})
 		for _, key := range sorted {
+			keyValue, err := valueToValue(key, opt)
+			if err != nil {
+				return nil, err
+			}
 			value, err := valueToValue(v.MapIndex(key), opt)
 			if err != nil {
 				return nil, err
 			}
-			keyStr := key.String()
 			entries = append(entries, &MapEntry{
-				Key:   &String{Str: keyStr},
+				Key:   keyValue,
 				Value: value,
 			})
 		}
