@@ -95,7 +95,7 @@ func TestMarshal(t *testing.T) {
 			expected: `
 delay = string(optional default("24h"))
 `,
-			options: []MarshalOption{asSchema(true)},
+			options: []MarshalOption{asSchema()},
 		},
 		{name: "DurationPtrSchema",
 			src: &struct {
@@ -104,7 +104,7 @@ delay = string(optional default("24h"))
 			expected: `
 delay = string(optional default("24h"))
 `,
-			options: []MarshalOption{asSchema(true)},
+			options: []MarshalOption{asSchema()},
 		},
 		{name: "VarArgBlockLabels",
 			src: &struct {

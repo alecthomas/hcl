@@ -108,8 +108,7 @@ block label {
 }
 
 func TestJsonTaggedSchema(t *testing.T) {
-	var val interface{}
-	val = &jsonTaggedSchema{
+	val := &jsonTaggedSchema{
 		Str:     "testSchema",
 		Config:  keyValue{"key1", "val1"},
 		Options: &keyValue{},

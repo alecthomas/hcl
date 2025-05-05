@@ -401,7 +401,7 @@ func unmarshalValue(rv reflect.Value, v Value, opt *marshalState) error {
 		rv.Set(reflect.MakeMap(t))
 		for _, entry := range mapping.Entries {
 			key := reflect.New(t.Key()).Elem()
-			err := unmarshalMapKey(key, entry.Key, opt)
+			err := unmarshalMapKey(key, entry.Key)
 			if err != nil {
 				return participle.Wrapf(entry.Key.Position(), err, "invalid map key")
 			}
@@ -463,7 +463,7 @@ func unmarshalValue(rv reflect.Value, v Value, opt *marshalState) error {
 	return nil
 }
 
-func unmarshalMapKey(rv reflect.Value, v Value, opt *marshalState) error {
+func unmarshalMapKey(rv reflect.Value, v Value) error {
 	switch rv.Kind() {
 	case reflect.String:
 		switch v := v.(type) {

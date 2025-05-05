@@ -84,9 +84,9 @@ func WithSchemaComments(v bool) MarshalOption {
 	}
 }
 
-func asSchema(schema bool) MarshalOption {
+func asSchema() MarshalOption {
 	return func(options *marshalState) {
-		options.schema = schema
+		options.schema = true
 	}
 }
 

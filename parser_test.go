@@ -230,13 +230,12 @@ func hbool(b bool) Value {
 	return &Bool{Bool: b}
 }
 
-func normaliseAST(hcl *AST) *AST {
+func normaliseAST(hcl *AST) {
 	if hcl == nil {
-		return nil
+		return
 	}
 	hcl.Pos = lexer.Position{}
 	normaliseEntries(hcl.Entries)
-	return hcl
 }
 
 func normaliseEntries(entries []Entry) {
