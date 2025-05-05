@@ -151,6 +151,19 @@ func TestUnmarshal(t *testing.T) {
 				},
 			},
 		},
+		{name: "MapWithNonStringKeysAttribute",
+			hcl: `
+				map = {1: a, 2: b}
+			`,
+			dest: struct {
+				Map map[int]string `hcl:"map"`
+			}{
+				Map: map[int]string{
+					1: "a",
+					2: "b",
+				},
+			},
+		},
 		{name: "ListAttribute",
 			hcl: `
 				list = [1, 2, 3]

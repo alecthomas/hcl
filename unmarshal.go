@@ -398,22 +398,15 @@ func unmarshalValue(rv reflect.Value, v Value, opt *marshalState) error {
 			return participle.Errorf(v.Position(), "expected a map but got %s", v)
 		}
 		t := rv.Type()
-		if t.Key().Kind() != reflect.String {
-			panic(fmt.Sprintf("map keys must be strings but we have %s", t.Key()))
-		}
 		rv.Set(reflect.MakeMap(t))
 		for _, entry := range mapping.Entries {
 			key := reflect.New(t.Key()).Elem()
-			value := reflect.New(t.Elem()).Elem()
-			switch entryKey := entry.Key.(type) {
-			case *String:
-				key.SetString(entryKey.Str)
-			case *Type:
-				key.SetString(entryKey.Type)
-			default:
-				panic(fmt.Errorf("map key must be a string or type but is %s", entry.Key))
+			err := unmarshalMapKey(key, entry.Key, opt)
+			if err != nil {
+				return participle.Wrapf(entry.Key.Position(), err, "invalid map key")
 			}
-			err := unmarshalValue(value, entry.Value, opt)
+			value := reflect.New(t.Elem()).Elem()
+			err = unmarshalValue(value, entry.Value, opt)
 			if err != nil {
 				return participle.Wrapf(entry.Value.Position(), err, "invalid map value")
 			}
@@ -466,6 +459,50 @@ func unmarshalValue(rv reflect.Value, v Value, opt *marshalState) error {
 
 	default:
 		panic(rv.Kind().String())
+	}
+	return nil
+}
+
+func unmarshalMapKey(rv reflect.Value, v Value, opt *marshalState) error {
+	switch rv.Kind() {
+	case reflect.String:
+		switch v := v.(type) {
+		case *String:
+			rv.SetString(v.Str)
+		case *Type:
+			rv.SetString(v.Type)
+		case *Heredoc:
+			rv.SetString(v.GetHeredoc())
+		default:
+			return participle.Errorf(v.Position(), "expected a type or string but got %s", v)
+		}
+
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		number, ok := v.(*Number)
+		if !ok {
+			return participle.Errorf(v.Position(), "expected a number but got %s", v)
+		}
+		n, _ := number.Float.Int64()
+		rv.SetInt(n)
+
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		number, ok := v.(*Number)
+		if !ok {
+			return participle.Errorf(v.Position(), "expected a number but got %s", v)
+		}
+		n, _ := number.Float.Uint64()
+		rv.SetUint(n)
+
+	case reflect.Float32, reflect.Float64:
+		number, ok := v.(*Number)
+		if !ok {
+			return participle.Errorf(v.Position(), "expected a number but got %s", v)
+		}
+		n, _ := number.Float.Float64()
+		rv.SetFloat(n)
+
+	default:
+		panic(fmt.Sprintf("unsupported type for map keys: %s", rv.Kind().String()))
 	}
 	return nil
 }
