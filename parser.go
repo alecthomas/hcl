@@ -521,7 +521,7 @@ var (
 		participle.UseLookahead(50))
 )
 
-var stripCommentRe = regexp.MustCompile(`^//\s*|^/\*|\*/$`)
+var stripCommentRe = regexp.MustCompile(`^//\s*|^#\s*|^/\*|\*/$`)
 
 func stripComment(token lexer.Token) (lexer.Token, error) {
 	token.Value = stripCommentRe.ReplaceAllString(token.Value, "")
