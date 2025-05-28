@@ -99,12 +99,22 @@ EOF
 			hcl: `
 				// A comment
 				attr = true
+
+				# Another comment
+				attr2 = true
 			`,
-			expected: hcl(&Attribute{
-				Key:      "attr",
-				Value:    hbool(true),
-				Comments: []string{"A comment"},
-			}),
+			expected: hcl(
+				&Attribute{
+					Key:      "attr",
+					Value:    hbool(true),
+					Comments: []string{"A comment"},
+				},
+				&Attribute{
+					Key:      "attr2",
+					Value:    hbool(true),
+					Comments: []string{"Another comment"},
+				},
+			),
 		},
 		{name: "Attributes",
 			hcl: `
