@@ -210,11 +210,12 @@ EOF
 			hcl, err := ParseString(test.hcl)
 			if test.fail {
 				require.Error(t, err)
-			} else if err != nil {
+			} else {
+				require.NoError(t, err)
 				normaliseAST(hcl)
 				require.Equal(t,
 					repr.String(test.expected, repr.Indent("  ")),
-					repr.String(hcl, repr.Indent("  ")), "%s", err.Error())
+					repr.String(hcl, repr.Indent("  ")))
 			}
 		})
 	}
