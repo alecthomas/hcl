@@ -115,8 +115,7 @@ delay = string(optional default("24h"))
 				},
 			},
 			expected: `
-block multiple labels varargs {
-}
+block multiple labels varargs {}
 `,
 		},
 		{name: "LongVarArgBlockLabels",
@@ -129,8 +128,7 @@ block multiple labels varargs {
 			},
 			expected: `
 block multiple labels var-args really "really is" really really long labels that are
-      really long {
-}
+      really long {}
 `,
 		},
 		{name: "SingleReallyLongLabel",
@@ -146,8 +144,7 @@ block multiple labels var-args really "really is" really really long labels that
 				},
 			},
 			expected: `
-block "single label that is really really really really long with text that is really long" {
-}
+block "single label that is really really really really long with text that is really long" {}
 `,
 		},
 		{name: "Heredocs",

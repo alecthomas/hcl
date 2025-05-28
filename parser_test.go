@@ -23,11 +23,9 @@ func TestDetach(t *testing.T) {
 
 	actual, err := MarshalAST(ast)
 	require.NoError(t, err)
-	require.Equal(t, `one {
-}
+	require.Equal(t, `one {}
 
-three {
-}
+three {}
 `, string(actual))
 }
 
