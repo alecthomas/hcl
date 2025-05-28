@@ -688,6 +688,13 @@ func marshalBlock(w io.Writer, indent string, block *Block) error {
 		}
 		fmt.Fprintf(w, "%s", text)
 	}
+
+	// Check if block is empty
+	if len(block.Body) == 0 {
+		fmt.Fprintln(w, " {}")
+		return nil
+	}
+
 	fmt.Fprintln(w, " {")
 	err := marshalEntries(w, indent+"  ", block.Body)
 	if err != nil {
