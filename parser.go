@@ -425,6 +425,7 @@ type List struct {
 
 func (l *List) Clone() Value {
 	out := *l
+	out.List = make([]Value, len(l.List))
 	for i, value := range l.List {
 		out.List[i] = value.Clone()
 	}
@@ -461,6 +462,7 @@ type Map struct {
 
 func (m *Map) Clone() Value {
 	out := *m
+	out.Entries = make([]*MapEntry, len(m.Entries))
 	for i, entry := range m.Entries {
 		out.Entries[i] = entry.Clone()
 	}

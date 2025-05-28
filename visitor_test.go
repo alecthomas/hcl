@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	require "github.com/alecthomas/assert/v2"
+	"github.com/alecthomas/assert/v2"
 	"github.com/alecthomas/repr"
 )
 
@@ -17,15 +17,15 @@ func TestFind(t *testing.T) {
 		}
 	`
 	ast, err := ParseString(input)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	nodes := Find(ast, "attr")
-	require.Equal(t, len(nodes), 1)
-	require.Equal(t, reflect.TypeOf(&Attribute{}), reflect.TypeOf(nodes[0]))
+	assert.Equal(t, len(nodes), 1)
+	assert.Equal(t, reflect.TypeOf(&Attribute{}), reflect.TypeOf(nodes[0]))
 
 	nodes = Find(ast, "attr", "key", "block")
-	require.Equal(t, 3, len(nodes), repr.String(nodes, repr.Indent("  ")))
-	require.Equal(t, reflect.TypeOf(&Attribute{}), reflect.TypeOf(nodes[0]))
-	require.Equal(t, reflect.TypeOf(&Block{}), reflect.TypeOf(nodes[1]))
-	require.Equal(t, reflect.TypeOf(&MapEntry{}), reflect.TypeOf(nodes[2]))
+	assert.Equal(t, 3, len(nodes), repr.String(nodes, repr.Indent("  ")))
+	assert.Equal(t, reflect.TypeOf(&Attribute{}), reflect.TypeOf(nodes[0]))
+	assert.Equal(t, reflect.TypeOf(&Block{}), reflect.TypeOf(nodes[1]))
+	assert.Equal(t, reflect.TypeOf(&MapEntry{}), reflect.TypeOf(nodes[2]))
 }

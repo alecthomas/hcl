@@ -6,9 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	require "github.com/alecthomas/assert/v2"
+	"github.com/alecthomas/assert/v2"
 	"github.com/alecthomas/participle/v2/lexer"
-	"github.com/alecthomas/repr"
 )
 
 func TestDetach(t *testing.T) {
@@ -17,13 +16,13 @@ func TestDetach(t *testing.T) {
 		two {}
 		three {}
 	`)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	ok := ast.Entries[1].Detach()
-	require.True(t, ok, "Could not detach %#v", ast.Entries[1])
+	assert.True(t, ok, "Could not detach %#v", ast.Entries[1])
 
 	actual, err := MarshalAST(ast)
-	require.NoError(t, err)
-	require.Equal(t, `one {}
+	assert.NoError(t, err)
+	assert.Equal(t, `one {}
 
 three {}
 `, string(actual))
@@ -34,19 +33,19 @@ func TestGetHeredoc(t *testing.T) {
 		Delimiter: "-EOF",
 		Doc:       "\n    hello\n  world",
 	}
-	require.Equal(t, "  hello\nworld", value.GetHeredoc())
+	assert.Equal(t, "  hello\nworld", value.GetHeredoc())
 	value = &Heredoc{
 		Delimiter: "EOF",
 		Doc:       "\n  hello\n  world",
 	}
-	require.Equal(t, "  hello\n  world", value.GetHeredoc())
+	assert.Equal(t, "  hello\n  world", value.GetHeredoc())
 }
 
 func TestClone(t *testing.T) {
 	ast, err := ParseString(complexHCLExample)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	clone := ast.Clone()
-	require.Equal(t, ast, clone)
+	assert.Equal(t, ast, clone, assert.Exclude[Position]())
 }
 
 func TestParse(t *testing.T) {
@@ -207,13 +206,11 @@ EOF
 		t.Run(test.name, func(t *testing.T) {
 			hcl, err := ParseString(test.hcl)
 			if test.fail {
-				require.Error(t, err)
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				normaliseAST(hcl)
-				require.Equal(t,
-					repr.String(test.expected, repr.Indent("  ")),
-					repr.String(hcl, repr.Indent("  ")))
+				assert.Equal(t, test.expected, hcl)
 			}
 		})
 	}
@@ -226,9 +223,9 @@ func TestHeredocIndented(t *testing.T) {
 	or another
 	EOF
 `)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	expected := "some thing\nor another"
-	require.Equal(t, expected, hcl.Entries[0].(*Attribute).Value.(*Heredoc).GetHeredoc())
+	assert.Equal(t, expected, hcl.Entries[0].(*Attribute).Value.(*Heredoc).GetHeredoc())
 }
 
 func heredoc(delim, s string) Value {

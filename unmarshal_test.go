@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	require "github.com/alecthomas/assert/v2"
+	"github.com/alecthomas/assert/v2"
 	"github.com/alecthomas/repr"
 )
 
@@ -53,13 +53,13 @@ func runTests(t *testing.T, tests []test) {
 			actual := rv.Interface()
 			err := Unmarshal([]byte(test.hcl), actual, test.options...)
 			if test.fail != "" {
-				require.EqualError(t, err, test.fail)
+				assert.EqualError(t, err, test.fail)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				if test.fixup != nil {
 					test.fixup(actual)
 				}
-				require.Equal(t,
+				assert.Equal(t,
 					repr.String(test.dest, repr.Indent("  ")),
 					repr.String(rv.Elem().Interface(), repr.Indent("  ")))
 			}
@@ -83,7 +83,7 @@ func TestUnmarshal(t *testing.T) {
 		Str string `json:"str"`
 	}
 	timestamp, err := time.Parse(time.RFC3339, "2020-01-02T15:04:05Z")
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	tests := []test{
 		{name: "Embed",
 			hcl: `
@@ -544,7 +544,7 @@ type Config struct {
 func TestUnmarshalComplex(t *testing.T) {
 	config := Config{}
 	err := Unmarshal([]byte(complexHCLExample), &config)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	expected := Config{
 		AWS: AWS{
 			CredentialsProvider: "ROTATING_JSON",
@@ -588,7 +588,7 @@ func TestUnmarshalComplex(t *testing.T) {
 			},
 		},
 	}
-	require.Equal(t, expected, config)
+	assert.Equal(t, expected, config)
 }
 
 func TestUnmarshalBlock(t *testing.T) {
@@ -598,11 +598,11 @@ func TestUnmarshalBlock(t *testing.T) {
 	}
 	`
 	hcl, err := ParseString(config)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	rule := &Rule{}
 	err = UnmarshalBlock(hcl.Entries[0].(*Block), rule)
-	require.NoError(t, err)
-	require.Equal(t, &Rule{
+	assert.NoError(t, err)
+	assert.Equal(t, &Rule{
 		Target: "/**",
 		Users:  []string{"alec"},
 	}, rule)
@@ -615,9 +615,9 @@ func TestUnmarshalPointers(t *testing.T) {
 	err := Unmarshal([]byte(`
 f = "2017-07-07T00:00:00Z"
 `), &b)
-	require.NoError(t, err)
-	require.NotZero(t, b.F)
-	require.Equal(t, time.Date(2017, 7, 7, 0, 0, 0, 0, time.UTC), *b.F)
+	assert.NoError(t, err)
+	assert.NotZero(t, b.F)
+	assert.Equal(t, time.Date(2017, 7, 7, 0, 0, 0, 0, time.UTC), *b.F)
 }
 
 func TestUnmarshalPointers2(t *testing.T) {
@@ -631,11 +631,11 @@ f {
 	g = "str"
 }
 `), &b)
-	require.NoError(t, err)
-	require.Equal(t, "str", b.F.G)
+	assert.NoError(t, err)
+	assert.Equal(t, "str", b.F.G)
 	data, err := Marshal(&b)
-	require.NoError(t, err)
-	require.Equal(t, "f {\n  g = \"str\"\n}\n", string(data))
+	assert.NoError(t, err)
+	assert.Equal(t, "f {\n  g = \"str\"\n}\n", string(data))
 }
 
 type defaultStruct struct {
@@ -684,8 +684,8 @@ nested {
 	actual := defaultStruct{}
 
 	err := Unmarshal([]byte(hcl), &actual)
-	require.NoError(t, err)
-	require.Equal(t, actual, expected)
+	assert.NoError(t, err)
+	assert.Equal(t, actual, expected)
 
 }
 
@@ -955,8 +955,8 @@ refs {
 	}
 	var actual jsonTaggedSchema
 	err := Unmarshal([]byte(hcl), &actual)
-	require.NoError(t, err)
-	require.Equal(t, actual, expected)
+	assert.NoError(t, err)
+	assert.Equal(t, actual, expected)
 }
 
 func TestOrder(t *testing.T) {
@@ -988,7 +988,7 @@ b {}
 a {}
 b {}
 `), &actual)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	blocks := []*Blocks{}
 	for _, a := range actual.A {
 		blocks = append(blocks, &Blocks{A: a})
@@ -1005,7 +1005,7 @@ b {}
 		{A: &A{Pos: Position{Offset: 11, Line: 4, Column: 1}}},
 		{B: &B{Pos: Position{Offset: 16, Line: 5, Column: 1}}},
 	}
-	require.Equal(t, expected, blocks)
+	assert.Equal(t, expected, blocks)
 }
 
 type nonemptyInterface interface {
@@ -1015,7 +1015,7 @@ type nonemptyInterface interface {
 func TestUnmarshallInterfaces(t *testing.T) {
 	tests := []test{
 		{
-			name: "basic str",
+			name: "BasicStr",
 			hcl:  "f = \"hello\"",
 			dest: struct {
 				IfaceStr any `hcl:"f"`
@@ -1024,20 +1024,20 @@ func TestUnmarshallInterfaces(t *testing.T) {
 			},
 		},
 		{
-			name: "heterogeneous simple vals",
+			name: "HeterogeneousSimpleVals",
 			hcl:  "a = 123\nb = true\nc = 1.2\n",
 			dest: struct {
 				A interface{} `hcl:"a"`
 				B interface{} `hcl:"b"`
 				C interface{} `hcl:"c"`
 			}{
-				A: 123,
+				A: 123.0,
 				B: true,
 				C: 1.2,
 			},
 		},
 		{
-			name: "any to map",
+			name: "AnyToMap",
 			hcl:  `ifaceval = {a: "hello", b: "bye"}`,
 			dest: struct {
 				Ifaceval interface{} `hcl:"ifaceval"`
@@ -1049,7 +1049,7 @@ func TestUnmarshallInterfaces(t *testing.T) {
 			},
 		},
 		{
-			name: "any to nested map",
+			name: "AnyToNestedMap",
 			hcl:  `ifaceval = {a: "hello", b: {c: "inner"} }`,
 			dest: struct {
 				Ifaceval interface{} `hcl:"ifaceval"`
@@ -1063,7 +1063,7 @@ func TestUnmarshallInterfaces(t *testing.T) {
 			},
 		},
 		{
-			name: "slice to interface{}",
+			name: "SliceToInterface",
 			hcl:  `ifaveval = ["a", "b", "c"]`,
 			dest: struct {
 				Ifaceval interface{} `hcl:"ifaveval"`
@@ -1072,7 +1072,7 @@ func TestUnmarshallInterfaces(t *testing.T) {
 			},
 		},
 		{
-			name: "nonempty interface fails",
+			name: "NonemptyInterfaceFails",
 			hcl:  `ifaceval = {a: "hello", b: "bye"}`,
 			dest: struct {
 				Ifaceval nonemptyInterface `hcl:"ifaceval"`
@@ -1082,7 +1082,7 @@ func TestUnmarshallInterfaces(t *testing.T) {
 			fail: "1:12: failed to unmarshal value: invalid interface target: expected any/interface{} but got hcl.nonemptyInterface",
 		},
 		{
-			name: "block",
+			name: "Block",
 			hcl: `s = "asdf"
                   block {
                     hello = "test"

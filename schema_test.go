@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	require "github.com/alecthomas/assert/v2"
+	"github.com/alecthomas/assert/v2"
 )
 
 type testSchema struct {
@@ -77,16 +77,16 @@ enum_str = string(enum("a", "b", "c"))
 
 func TestSchema(t *testing.T) {
 	expected, err := Schema(&testSchema{})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	data, err := MarshalAST(expected)
-	require.NoError(t, err)
-	require.Equal(t, strings.TrimSpace(expectedSchema), strings.TrimSpace(string(data)))
+	assert.NoError(t, err)
+	assert.Equal(t, strings.TrimSpace(expectedSchema), strings.TrimSpace(string(data)))
 	actual, err := ParseBytes(data)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	normaliseAST(actual)
 	normaliseAST(expected)
 	expected.Schema = false
-	require.Equal(t, expected, actual)
+	assert.Equal(t, expected, actual)
 }
 
 func TestBlockSchema(t *testing.T) {
@@ -95,10 +95,10 @@ func TestBlockSchema(t *testing.T) {
 		Attr  string `hcl:"attr"`
 	}
 	schema, err := BlockSchema("block", &Block{})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	data, err := MarshalAST(schema)
-	require.NoError(t, err)
-	require.Equal(t,
+	assert.NoError(t, err)
+	assert.Equal(t,
 		strings.TrimSpace(`
 block label {
   attr = string
@@ -115,9 +115,9 @@ func TestJsonTaggedSchema(t *testing.T) {
 		Refs:    []objectRef{{"ref11"}, {"ref12"}, {"ref13"}},
 	}
 	schema, err := Schema(val, InferHCLTags(true))
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	data, err := MarshalAST(schema)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	expectedSchema := `
 str = string
 
@@ -135,7 +135,7 @@ refs(repeated) {
   name = string
 }
     `
-	require.Equal(t, strings.TrimSpace(expectedSchema), strings.TrimSpace(string(data)))
+	assert.Equal(t, strings.TrimSpace(expectedSchema), strings.TrimSpace(string(data)))
 }
 
 type RecursiveSchema struct {
@@ -146,10 +146,10 @@ type RecursiveSchema struct {
 
 func TestRecursiveSchema(t *testing.T) {
 	ast, err := Schema(&RecursiveSchema{})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	schema, err := MarshalAST(ast)
-	require.NoError(t, err)
-	require.Equal(t, `// Name of user.
+	assert.NoError(t, err)
+	assert.Equal(t, `// Name of user.
 name = string
 // Age of user.
 age = number(optional)

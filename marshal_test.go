@@ -6,15 +6,15 @@ import (
 	"testing"
 	"time"
 
-	require "github.com/alecthomas/assert/v2"
+	"github.com/alecthomas/assert/v2"
 )
 
 func TestMarshalASTComplex(t *testing.T) {
 	ast, err := ParseString(complexHCLExample)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	data, err := MarshalAST(ast)
-	require.NoError(t, err)
-	require.Equal(t,
+	assert.NoError(t, err)
+	assert.Equal(t,
 		strings.TrimSpace(complexHCLExample),
 		strings.TrimSpace(string(data)))
 }
@@ -26,8 +26,8 @@ func TestRoundTripEmptyList(t *testing.T) {
 	expected := hcl(attr("list", list()))
 	actual := &conf{}
 	err := UnmarshalAST(expected, actual)
-	require.NoError(t, err)
-	require.Equal(t, &conf{
+	assert.NoError(t, err)
+	assert.Equal(t, &conf{
 		List: []string{},
 	}, actual)
 }
@@ -39,8 +39,8 @@ func TestRoundTripEmptyMap(t *testing.T) {
 	expected := hcl(attr("map", hmap()))
 	actual := &conf{}
 	err := UnmarshalAST(expected, actual)
-	require.NoError(t, err)
-	require.Equal(t, &conf{
+	assert.NoError(t, err)
+	assert.Equal(t, &conf{
 		Map: map[string]string{},
 	}, actual)
 }
@@ -48,20 +48,20 @@ func TestRoundTripEmptyMap(t *testing.T) {
 func TestMarshalComplex(t *testing.T) {
 	config := Config{}
 	err := Unmarshal([]byte(complexHCLExample), &config)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	data, err := Marshal(&config)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	// Normalise the HCL by removing comments.
 	ast, err := ParseString(complexHCLExample)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	err = StripComments(ast)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	normalised, err := MarshalAST(ast)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
-	require.Equal(t,
+	assert.Equal(t,
 		strings.TrimSpace(string(normalised)),
 		strings.TrimSpace(string(data)))
 }
@@ -78,7 +78,7 @@ func (j *jsonMarshalValue) MarshalJSON() ([]byte, error) {
 
 func TestMarshal(t *testing.T) {
 	timestamp, err := time.Parse(time.RFC3339, "2020-01-02T15:04:05Z")
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	type varArgLabelBlock struct {
 		Path []string `hcl:"path,label"`
 	}
@@ -387,8 +387,8 @@ attr = "string"
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			data, err := Marshal(test.src, test.options...)
-			require.NoError(t, err)
-			require.Equal(t, strings.TrimSpace(test.expected), strings.TrimSpace(string(data)))
+			assert.NoError(t, err)
+			assert.Equal(t, strings.TrimSpace(test.expected), strings.TrimSpace(string(data)))
 		})
 	}
 }
@@ -407,15 +407,15 @@ default_val = "2"
 	v := &TestStruct{}
 
 	err := Unmarshal([]byte(hcl), v)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
-	require.Equal(t, v.Val, "val")
-	require.Equal(t, v.DefaultVal, "2")
-	require.Equal(t, v.DefaultVal2, int64(60))
+	assert.Equal(t, v.Val, "val")
+	assert.Equal(t, v.DefaultVal, "2")
+	assert.Equal(t, v.DefaultVal2, int64(60))
 
 	marshalled, err := Marshal(v)
-	require.NoError(t, err)
-	require.Equal(t, strings.TrimSpace(hcl), strings.TrimSpace(string(marshalled)))
+	assert.NoError(t, err)
+	assert.Equal(t, strings.TrimSpace(hcl), strings.TrimSpace(string(marshalled)))
 
 }
 
@@ -428,6 +428,6 @@ func TestOptionalDefaultOmitted(t *testing.T) {
 		Embedded
 	}
 	data, err := Marshal(&Root{})
-	require.NoError(t, err)
-	require.Equal(t, "", string(data))
+	assert.NoError(t, err)
+	assert.Equal(t, "", string(data))
 }
