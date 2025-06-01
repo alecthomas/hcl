@@ -431,3 +431,33 @@ func TestOptionalDefaultOmitted(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "", string(data))
 }
+
+func TestMarshalAST(t *testing.T) {
+	tests := []struct {
+		name     string
+		expected string
+		ast      *AST
+	}{
+		{name: "BlockWithTrailingComments",
+			expected: `block {
+  attr = false
+
+  // trailing comment
+}
+`,
+			ast: hcl(&Block{
+				Name:             "block",
+				Body:             []Entry{attr("attr", hbool(false))},
+				TrailingComments: []string{"trailing comment"},
+			}),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			normaliseAST(test.ast)
+			b, err := MarshalAST(test.ast)
+			assert.NoError(t, err)
+			assert.Equal(t, test.expected, string(b))
+		})
+	}
+}

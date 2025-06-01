@@ -169,6 +169,20 @@ EOF
 			`,
 			expected: hcl(block("block", nil, block("nested", nil))),
 		},
+		{name: "BlockWithTrailingComments",
+			hcl: `
+					block {
+					  attr = false
+
+					  // trailing comment
+					}
+				`,
+			expected: hcl(&Block{
+				Name:             "block",
+				Body:             []Entry{attr("attr", hbool(false))},
+				TrailingComments: []string{"trailing comment"},
+			}),
+		},
 		{name: "EmptyList",
 			hcl:      `a = []`,
 			expected: hcl(attr("a", list()))},
