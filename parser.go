@@ -19,6 +19,20 @@ import (
 // Position in source file.
 type Position = lexer.Position
 
+// CommentList represents a list of comments that can handle multiline comment splitting
+type CommentList []string
+
+// Capture implements the participle Capture interface to split multiline comments
+func (c *CommentList) Capture(values []string) error {
+	for _, value := range values {
+		for _, line := range strings.Split(value, "\n") {
+			*c = append(*c, line)
+		}
+	}
+
+	return nil
+}
+
 // Node is the the interface implemented by all AST nodes.
 type Node interface {
 	Position() Position
@@ -52,9 +66,9 @@ func (e Entries) MarshalJSON() ([]byte, error) {
 type AST struct {
 	Pos lexer.Position `parser:""`
 
-	Entries          Entries  `parser:"@@*"`
-	TrailingComments []string `parser:"@Comment*"`
-	Schema           bool     `parser:""`
+	Entries          Entries     `parser:"@@*"`
+	TrailingComments CommentList `parser:"@Comment*"`
+	Schema           bool        `parser:""`
 }
 
 func (a *AST) Detach() bool { return false }
@@ -110,7 +124,7 @@ type Attribute struct {
 	Pos    lexer.Position `parser:""`
 	Parent Node           `parser:""`
 
-	Comments []string `parser:"@Comment*"`
+	Comments CommentList `parser:"@Comment*"`
 
 	Key   string `parser:"@Ident"`
 	Value Value  `parser:"( '=':Punct @@ )?"`
@@ -151,14 +165,14 @@ type Block struct {
 	Pos    lexer.Position `parser:""`
 	Parent Node           `parser:""`
 
-	Comments []string `parser:"@Comment*"`
+	Comments CommentList `parser:"@Comment*"`
 
 	Name     string   `parser:"@Ident"`
 	Repeated bool     `parser:"( '(' @'repeated' ')' )?"`
 	Labels   []string `parser:"@( Ident | String )*"`
 	Body     Entries  `parser:"'{' @@*"`
 
-	TrailingComments []string `parser:"@Comment* '}'"`
+	TrailingComments CommentList `parser:"@Comment* '}'"`
 }
 
 var _ Entry = &Block{}
@@ -501,7 +515,7 @@ var (
 			{"Heredoc", `<<[-]?(\w+\b)`, lexer.Push("Heredoc")},
 			{"String", `"(\\\d\d\d|\\.|[^"])*"|'(\\\d\d\d|\\.|[^'])*'`, nil},
 			{"Punct", `[][*?{}=:,()|]`, nil},
-			{"Comment", `(?:(?://|#)[^\n]*)|/\*.*?\*/`, nil},
+			{"Comment", `(?:(?://|#)[^\n]*(?:\n\s*(?://|#)[^\n]*)*)|/\*.*?\*/`, nil},
 			{"Whitespace", `\s+`, nil},
 		},
 		"Heredoc": {
@@ -523,10 +537,24 @@ var (
 		participle.UseLookahead(50))
 )
 
-var stripCommentRe = regexp.MustCompile(`^//\s*|^#\s*|^/\*|\*/$`)
+var stripCommentRe = regexp.MustCompile(`^[ \t]*(?://|#|/\*)|\*/$`)
+var matchLeadingWhitespaceRe = regexp.MustCompile(`^[ \t]*`)
 
 func stripComment(token lexer.Token) (lexer.Token, error) {
-	token.Value = stripCommentRe.ReplaceAllString(token.Value, "")
+	// Strip comment markers (//, #, /*...*/).
+	lines := strings.Split(token.Value, "\n")
+	for i, line := range lines {
+		lines[i] = stripCommentRe.ReplaceAllString(line, "")
+	}
+
+	// Outdent a multiline comment consistently: by the
+	// amount of leading whitespace on the first line.
+	prefix := matchLeadingWhitespaceRe.FindString(lines[0])
+	for i, line := range lines {
+		lines[i] = strings.TrimPrefix(line, prefix)
+	}
+
+	token.Value = strings.Join(lines, "\n")
 	return token, nil
 }
 

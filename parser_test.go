@@ -113,6 +113,58 @@ EOF
 				},
 			),
 		},
+		{name: "Comments with internal whitespace",
+			hcl: `
+				// Uncomment this to use it
+				// block {
+				//   env = {
+				//     KEY: value
+				//   } 
+				// }
+			`,
+			expected: &AST{
+				TrailingComments: []string{
+					"Uncomment this to use it",
+					"block {",
+					"  env = {",
+					"    KEY: value",
+					"  } ",
+					"}",
+				},
+			},
+		},
+		{name: "Multiline comments with varying indentation",
+			hcl: `
+				block {
+					//env = {
+					//  KEY: value
+					//}
+				}
+				block {
+					//   env = {
+					//     KEY: value
+					//   }
+				}
+			`,
+			expected: hcl(
+				&Block{
+					Name: "block",
+					TrailingComments: []string{
+						"env = {",
+						"  KEY: value",
+						"}",
+					},
+				},
+				&Block{
+					Name: "block",
+					TrailingComments: []string{
+						"env = {",
+						"  KEY: value",
+						"}",
+					},
+				},
+			),
+		},
 		{name: "Attributes",
 			hcl: `
 				true_bool = true
