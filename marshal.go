@@ -689,8 +689,8 @@ func marshalBlock(w io.Writer, indent string, block *Block) error {
 		fmt.Fprintf(w, "%s", text)
 	}
 
-	// Check if block is empty
-	if len(block.Body) == 0 {
+	// Check if block is empty and has no trailing comments
+	if len(block.Body) == 0 && len(block.TrailingComments) == 0 {
 		fmt.Fprintln(w, " {}")
 		return nil
 	}
@@ -699,6 +699,13 @@ func marshalBlock(w io.Writer, indent string, block *Block) error {
 	err := marshalEntries(w, indent+"  ", block.Body)
 	if err != nil {
 		return err
+	}
+	// Marshal trailing comments before closing brace
+	if len(block.TrailingComments) > 0 {
+		if len(block.Body) > 0 {
+			fmt.Fprintln(w)
+		}
+		marshalComments(w, indent+"  ", block.TrailingComments)
 	}
 	fmt.Fprintf(w, "%s}\n", indent)
 	return nil
