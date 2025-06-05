@@ -44,6 +44,9 @@ func addParentRefs(parent, node Node) {
 			addParentRefs(node, entry)
 		}
 
+	case *Comment:
+		node.Parent = parent
+
 	case *MapEntry:
 		node.Parent = parent
 
