@@ -13,6 +13,9 @@ func StripComments(node Node) error {
 		case *Attribute:
 			node.Comments = nil
 
+		case *Comment:
+			node.Comments = nil
+
 		case *Block:
 			node.Comments = nil
 
@@ -43,6 +46,9 @@ func addParentRefs(parent, node Node) {
 		for _, entry := range node.Body {
 			addParentRefs(node, entry)
 		}
+
+	case *Comment:
+		node.Parent = parent
 
 	case *MapEntry:
 		node.Parent = parent

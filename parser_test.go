@@ -123,6 +123,16 @@ EOF
 				// }
 			`,
 			expected: &AST{
+				Entries: []Entry{
+					&Comment{Comments: []string{
+						"Uncomment this to use it",
+						"block {",
+						"  env = {",
+						"    KEY: value",
+						"  } ",
+						"}",
+					}},
+				},
 				TrailingComments: []string{
 					"Uncomment this to use it",
 					"block {",
@@ -149,6 +159,15 @@ EOF
 			expected: hcl(
 				&Block{
 					Name: "block",
+					Body: []Entry{
+						&Comment{
+							Comments: []string{
+								"env = {",
+								"  KEY: value",
+								"}",
+							},
+						},
+					},
 					TrailingComments: []string{
 						"env = {",
 						"  KEY: value",
@@ -157,6 +176,15 @@ EOF
 				},
 				&Block{
 					Name: "block",
+					Body: []Entry{
+						&Comment{
+							Comments: []string{
+								"env = {",
+								"  KEY: value",
+								"}",
+							},
+						},
+					},
 					TrailingComments: []string{
 						"env = {",
 						"  KEY: value",
@@ -229,11 +257,18 @@ EOF
 					  // trailing comment
 					}
 				`,
-			expected: hcl(&Block{
-				Name:             "block",
-				Body:             []Entry{attr("attr", hbool(false))},
-				TrailingComments: []string{"trailing comment"},
-			}),
+			expected: hcl(
+				&Block{
+					Name: "block",
+					Body: []Entry{
+						attr("attr", hbool(false)),
+						&Comment{
+							Comments: []string{"trailing comment"},
+						},
+					},
+					TrailingComments: []string{"trailing comment"},
+				},
+			),
 		},
 		{name: "EmptyList",
 			hcl:      `a = []`,
@@ -243,7 +278,13 @@ EOF
 					a = true
 					// trailing comment
 				`,
-			expected: trailingComments(hcl(attr("a", hbool(true))), "trailing comment")},
+			expected: &AST{
+				Entries: []Entry{
+					attr("a", hbool(true)),
+					&Comment{Comments: []string{"trailing comment"}},
+				},
+				TrailingComments: []string{"trailing comment"},
+			}},
 		{name: "AttributeWithoutValue",
 			hcl: `
 				attr
@@ -270,7 +311,39 @@ EOF
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			hcl, err := ParseString(test.hcl)
+			// Determine if this test expects Comment nodes to be preserved
+			expectsComments := false
+			for _, entry := range test.expected.Entries {
+				if _, isComment := entry.(*Comment); isComment {
+					expectsComments = true
+					break
+				}
+			}
+			// Also check nested entries in blocks
+			if !expectsComments {
+				for _, entry := range test.expected.Entries {
+					if block, isBlock := entry.(*Block); isBlock {
+						for _, bodyEntry := range block.Body {
+							if _, isComment := bodyEntry.(*Comment); isComment {
+								expectsComments = true
+								break
+							}
+						}
+						if expectsComments {
+							break
+						}
+					}
+				}
+			}
+
+			var hcl *AST
+			var err error
+			if expectsComments {
+				hcl, err = ParseString(test.hcl, WithDetachedComments(true))
+			} else {
+				hcl, err = ParseString(test.hcl)
+			}
+
 			if test.fail {
 				assert.Error(t, err)
 			} else {
@@ -313,6 +386,10 @@ func normaliseAST(hcl *AST) {
 func normaliseEntries(entries []Entry) {
 	for _, entry := range entries {
 		switch entry := entry.(type) {
+		case *Comment:
+			entry.Pos = lexer.Position{}
+			entry.Parent = nil
+
 		case *Block:
 			entry.Pos = lexer.Position{}
 			entry.Parent = nil
@@ -372,11 +449,6 @@ func hcl(entries ...Entry) *AST {
 	return &AST{Entries: entries}
 }
 
-func trailingComments(ast *AST, comments ...string) *AST {
-	ast.TrailingComments = comments
-	return ast
-}
-
 func block(name string, labels []string, entries ...Entry) Entry {
 	return &Block{
 		Name:   name,
@@ -399,4 +471,108 @@ func num(n float64) Value {
 	// b, _, _ := big.ParseFloat(s, 10, 64, 0)
 	_, _, _ = b.Parse(s, 0)
 	return &Number{Float: b}
+}
+
+func TestFunctionalOptions(t *testing.T) {
+	hclContent := `
+		// This is a comment
+		attr = "value"
+		
+		block {
+			// Another comment
+			nested_attr = true
+		}
+		
+		// Trailing comment
+	`
+
+	t.Run("DefaultBehavior", func(t *testing.T) {
+		// Test default behavior (comments stripped)
+		ast, err := ParseString(hclContent)
+		assert.NoError(t, err)
+
+		// Should have 2 entries: attribute and block (standalone comments stripped)
+		assert.Equal(t, 2, len(ast.Entries))
+
+		// First entry should be attribute with prefix comment
+		attr, ok := ast.Entries[0].(*Attribute)
+		assert.True(t, ok)
+		assert.Equal(t, "attr", attr.Key)
+		assert.Equal(t, []string{"This is a comment"}, attr.Comments)
+
+		// Second entry should be block
+		block, ok := ast.Entries[1].(*Block)
+		assert.True(t, ok)
+		assert.Equal(t, "block", block.Name)
+
+		// Block should have 1 entry (nested attribute with prefix comment)
+		assert.Equal(t, 1, len(block.Body))
+		nestedAttr, ok := block.Body[0].(*Attribute)
+		assert.True(t, ok)
+		assert.Equal(t, "nested_attr", nestedAttr.Key)
+		assert.Equal(t, []string{"Another comment"}, nestedAttr.Comments)
+
+		// No standalone Comment entries should be present
+		for _, entry := range ast.Entries {
+			_, isComment := entry.(*Comment)
+			assert.False(t, isComment, "Found unexpected standalone Comment entry")
+		}
+		for _, entry := range block.Body {
+			_, isComment := entry.(*Comment)
+			assert.False(t, isComment, "Found unexpected standalone Comment entry in block")
+		}
+
+		// Trailing comments should still be processed
+		assert.Equal(t, []string{"Trailing comment"}, ast.TrailingComments)
+	})
+
+	t.Run("WithDetachedComments", func(t *testing.T) {
+		// Test with detached comments enabled
+		ast, err := ParseString(hclContent, WithDetachedComments(true))
+		assert.NoError(t, err)
+
+		// Should have 3 entries: attribute, block, and trailing comment
+		assert.Equal(t, 3, len(ast.Entries))
+
+		// First entry should be attribute with prefix comment
+		attr, ok := ast.Entries[0].(*Attribute)
+		assert.True(t, ok)
+		assert.Equal(t, "attr", attr.Key)
+		assert.Equal(t, []string{"This is a comment"}, attr.Comments)
+
+		// Second entry should be block
+		block, ok := ast.Entries[1].(*Block)
+		assert.True(t, ok)
+		assert.Equal(t, "block", block.Name)
+
+		// Block should have 1 entry (nested attribute with prefix comment)
+		assert.Equal(t, 1, len(block.Body))
+		nestedAttr, ok := block.Body[0].(*Attribute)
+		assert.True(t, ok)
+		assert.Equal(t, "nested_attr", nestedAttr.Key)
+		assert.Equal(t, []string{"Another comment"}, nestedAttr.Comments)
+
+		// Third entry should be trailing comment
+		comment, ok := ast.Entries[2].(*Comment)
+		assert.True(t, ok)
+		assert.Equal(t, []string{"Trailing comment"}, comment.Comments)
+
+		// Trailing comments should still be processed
+		assert.Equal(t, []string{"Trailing comment"}, ast.TrailingComments)
+	})
+
+	t.Run("WithDetachedCommentsFalse", func(t *testing.T) {
+		// Test explicitly setting detached comments to false
+		ast, err := ParseString(hclContent, WithDetachedComments(false))
+		assert.NoError(t, err)
+
+		// Should behave same as default (standalone comments stripped)
+		assert.Equal(t, 2, len(ast.Entries))
+
+		// No standalone Comment entries should be present
+		for _, entry := range ast.Entries {
+			_, isComment := entry.(*Comment)
+			assert.False(t, isComment, "Found unexpected standalone Comment entry")
+		}
+	})
 }

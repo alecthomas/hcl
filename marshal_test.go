@@ -445,11 +445,18 @@ func TestMarshalAST(t *testing.T) {
   // trailing comment
 }
 `,
-			ast: hcl(&Block{
-				Name:             "block",
-				Body:             []Entry{attr("attr", hbool(false))},
-				TrailingComments: []string{"trailing comment"},
-			}),
+			ast: hcl(
+				&Block{
+					Name: "block",
+					Body: []Entry{
+						attr("attr", hbool(false)),
+						&Comment{
+							Comments: []string{"trailing comment"},
+						},
+					},
+					TrailingComments: []string{"trailing comment"},
+				},
+			),
 		},
 	}
 	for _, test := range tests {

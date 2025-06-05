@@ -545,6 +545,8 @@ func marshalNode(w io.Writer, indent string, node Node) error {
 		return marshalBlock(w, indent, node)
 	case *Attribute:
 		return marshalAttribute(w, indent, node)
+	case *Comment:
+		return marshalComments(w, indent, node.Comments)
 	case Value:
 		return marshalValue(w, indent, node)
 	default:
@@ -553,12 +555,7 @@ func marshalNode(w io.Writer, indent string, node Node) error {
 }
 
 func marshalAST(w io.Writer, indent string, node *AST) error {
-	err := marshalEntries(w, indent, node.Entries)
-	if err != nil {
-		return err
-	}
-	marshalComments(w, indent, node.TrailingComments)
-	return nil
+	return marshalEntries(w, indent, node.Entries)
 }
 
 func marshalEntries(w io.Writer, indent string, entries []Entry) error {
@@ -582,6 +579,15 @@ func marshalEntries(w io.Writer, indent string, entries []Entry) error {
 				return err
 			}
 			prevAttr = true
+
+		case *Comment:
+			if prevAttr {
+				fmt.Fprintln(w)
+			}
+			if err := marshalComments(w, indent, entry.Comments); err != nil {
+				return err
+			}
+			prevAttr = false
 
 		case *RecursiveEntry:
 			fmt.Fprintf(w, "%s// (recursive)\n", indent)
@@ -689,8 +695,7 @@ func marshalBlock(w io.Writer, indent string, block *Block) error {
 		fmt.Fprintf(w, "%s", text)
 	}
 
-	// Check if block is empty and has no trailing comments
-	if len(block.Body) == 0 && len(block.TrailingComments) == 0 {
+	if len(block.Body) == 0 {
 		fmt.Fprintln(w, " {}")
 		return nil
 	}
@@ -700,21 +705,15 @@ func marshalBlock(w io.Writer, indent string, block *Block) error {
 	if err != nil {
 		return err
 	}
-	// Marshal trailing comments before closing brace
-	if len(block.TrailingComments) > 0 {
-		if len(block.Body) > 0 {
-			fmt.Fprintln(w)
-		}
-		marshalComments(w, indent+"  ", block.TrailingComments)
-	}
 	fmt.Fprintf(w, "%s}\n", indent)
 	return nil
 }
 
-func marshalComments(w io.Writer, indent string, comments []string) {
+func marshalComments(w io.Writer, indent string, comments []string) error {
 	for _, comment := range comments {
 		for _, line := range strings.Split(comment, "\n") {
 			fmt.Fprintf(w, "%s// %s\n", indent, line)
 		}
 	}
+	return nil
 }

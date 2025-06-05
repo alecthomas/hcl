@@ -56,6 +56,8 @@ func (e Entries) MarshalJSON() ([]byte, error) {
 			kind = "attribute"
 		case *Block:
 			kind = "block"
+		case *Comment:
+			continue
 		}
 		out = append(out, []byte(fmt.Sprintf(`{%q: %s}`, kind, raw)))
 	}
@@ -66,9 +68,9 @@ func (e Entries) MarshalJSON() ([]byte, error) {
 type AST struct {
 	Pos lexer.Position `parser:""`
 
-	Entries          Entries     `parser:"@@*"`
-	TrailingComments CommentList `parser:"@Comment*"`
-	Schema           bool        `parser:""`
+	Entries          Entries `parser:"@@*"`
+	TrailingComments CommentList
+	Schema           bool `parser:""`
 }
 
 func (a *AST) Detach() bool { return false }
@@ -160,6 +162,32 @@ func (a *Attribute) Clone() Entry {
 	}
 }
 
+type Comment struct {
+	Pos    lexer.Position `parser:""`
+	Parent Node           `parser:""`
+
+	Comments CommentList `parser:"@Comment"`
+}
+
+var _ Entry = &Comment{}
+
+func (a *Comment) Detach() bool       { return detachEntry(a.Parent, a) }
+func (a *Comment) Position() Position { return a.Pos }
+func (a *Comment) EntryKey() string   { return "" }
+func (a *Comment) children() []Node   { return nil }
+func (a *Comment) String() string     { return "" }
+
+// Clone the AST.
+func (a *Comment) Clone() Entry {
+	if a == nil {
+		return nil
+	}
+	return &Comment{
+		Pos:      a.Pos,
+		Comments: cloneStrings(a.Comments),
+	}
+}
+
 // Block represents am optionally labelled HCL block.
 type Block struct {
 	Pos    lexer.Position `parser:""`
@@ -170,9 +198,9 @@ type Block struct {
 	Name     string   `parser:"@Ident"`
 	Repeated bool     `parser:"( '(' @'repeated' ')' )?"`
 	Labels   []string `parser:"@( Ident | String )*"`
-	Body     Entries  `parser:"'{' @@*"`
+	Body     Entries  `parser:"'{' @@* '}'"`
 
-	TrailingComments CommentList `parser:"@Comment* '}'"`
+	TrailingComments CommentList
 }
 
 var _ Entry = &Block{}
@@ -531,7 +559,7 @@ var (
 		participle.Map(cleanHeredocStart, "Heredoc"),
 		participle.Map(stripComment, "Comment"),
 		participle.Elide("Whitespace"),
-		participle.Union[Entry](&Block{}, &Attribute{}),
+		participle.Union[Entry](&Block{}, &Attribute{}, &Comment{}),
 		participle.Union[Value](&Bool{}, &Type{}, &String{}, &Number{}, &List{}, &Map{}, &Heredoc{}),
 		// We need lookahead to ensure prefixed comments are associated with the right nodes.
 		participle.UseLookahead(50))
@@ -576,31 +604,140 @@ func cleanHeredocStart(token lexer.Token) (lexer.Token, error) {
 	return token, nil
 }
 
+// populateTrailingComments copies trailing comments from Comment nodes to TrailingComments fields.
+func populateTrailingComments(ast *AST) error {
+	populateTrailingCommentsInEntries(ast.Entries, &ast.TrailingComments)
+
+	return Visit(ast, func(node Node, next func() error) error {
+		if block, ok := node.(*Block); ok {
+			populateTrailingCommentsInEntries(block.Body, &block.TrailingComments)
+		}
+		return next()
+	})
+}
+
+// populateTrailingCommentsInEntries finds trailing Comment nodes and copies their comments
+func populateTrailingCommentsInEntries(entries Entries, trailingComments *CommentList) {
+	// Find the last non-comment entry index
+	lastNonCommentIndex := -1
+	for i := len(entries) - 1; i >= 0; i-- {
+		if _, isComment := entries[i].(*Comment); !isComment {
+			lastNonCommentIndex = i
+			break
+		}
+	}
+
+	// Collect all trailing comments (comments after the last non-comment entry)
+	for i := lastNonCommentIndex + 1; i < len(entries); i++ {
+		if comment, ok := entries[i].(*Comment); ok {
+			*trailingComments = append(*trailingComments, comment.Comments...)
+		}
+	}
+}
+
+// ParseOption represents a functional option for Parse, ParseString, and ParseBytes.
+type ParseOption func(*parseConfig)
+
+// parseConfig holds the configuration for parsing.
+type parseConfig struct {
+	detachedComments bool
+}
+
+// WithDetachedComments controls whether detached comments are preserved in the AST.
+// If set to false (default), Comment nodes will be stripped from the AST during post-processing.
+// If set to true, Comment nodes will be preserved as separate entries in the AST.
+func WithDetachedComments(preserve bool) ParseOption {
+	return func(config *parseConfig) {
+		config.detachedComments = preserve
+	}
+}
+
 // Parse HCL from an io.Reader.
-func Parse(r io.Reader) (*AST, error) {
+func Parse(r io.Reader, options ...ParseOption) (*AST, error) {
+	config := &parseConfig{}
+	for _, option := range options {
+		option(config)
+	}
+
 	hcl, err := parser.Parse("", r)
 	if err != nil {
 		return nil, err
 	}
-	return hcl, AddParentRefs(hcl)
+
+	return config.postProccessAST(hcl)
 }
 
 // ParseString parses HCL from a string.
-func ParseString(str string) (*AST, error) {
+func ParseString(str string, options ...ParseOption) (*AST, error) {
+	config := &parseConfig{}
+	for _, option := range options {
+		option(config)
+	}
+
 	hcl, err := parser.ParseString("", str)
 	if err != nil {
 		return nil, err
 	}
-	return hcl, AddParentRefs(hcl)
+
+	return config.postProccessAST(hcl)
 }
 
 // ParseBytes parses HCL from bytes.
-func ParseBytes(data []byte) (*AST, error) {
+func ParseBytes(data []byte, options ...ParseOption) (*AST, error) {
+	config := &parseConfig{}
+	for _, option := range options {
+		option(config)
+	}
+
 	hcl, err := parser.ParseBytes("", data)
 	if err != nil {
 		return nil, err
 	}
-	return hcl, AddParentRefs(hcl)
+
+	return config.postProccessAST(hcl)
+}
+
+func (config *parseConfig) postProccessAST(hcl *AST) (*AST, error) {
+	err := AddParentRefs(hcl)
+	if err != nil {
+		return nil, err
+	}
+
+	err = populateTrailingComments(hcl)
+	if err != nil {
+		return nil, err
+	}
+
+	if !config.detachedComments {
+		stripDetachedComments(hcl)
+	}
+
+	return hcl, nil
+}
+
+// stripDetachedComments removes all Comment nodes from the AST recursively.
+func stripDetachedComments(ast *AST) {
+	// Strip comments from the root entries
+	ast.Entries = stripCommentsFromEntries(ast.Entries)
+
+	// Strip comments from all blocks recursively
+	Visit(ast, func(node Node, next func() error) error {
+		if block, ok := node.(*Block); ok {
+			block.Body = stripCommentsFromEntries(block.Body)
+		}
+		return next()
+	})
+}
+
+// stripCommentsFromEntries removes Comment entries from a slice of entries.
+func stripCommentsFromEntries(entries Entries) Entries {
+	filtered := make(Entries, 0, len(entries))
+	for _, entry := range entries {
+		if _, isComment := entry.(*Comment); !isComment {
+			filtered = append(filtered, entry)
+		}
+	}
+	return filtered
 }
 
 func cloneStrings(strings []string) []string {
