@@ -209,10 +209,10 @@ EOF
 		},
 		{name: "BlockWithLabels",
 			hcl: `
-				block label0 "label1" {}
+				block label--0 "label1" {}
 			`,
 			expected: hcl(
-				block("block", []string{"label0", "label1"}),
+				block("block", []string{"label--0", "label1"}),
 			),
 		},
 		{name: "NestedBlocks",

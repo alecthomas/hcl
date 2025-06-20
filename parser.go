@@ -510,7 +510,7 @@ func (m *Map) value() {}
 var (
 	lex = lexer.Must(lexer.New(lexer.Rules{
 		"Root": {
-			{"Ident", `\b[[:alpha:]]\w*(-\w+)*\b`, nil},
+			{"Ident", `\b[[:alpha:]][\w-]*`, nil},
 			{"Number", `^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?`, nil},
 			{"Heredoc", `<<[-]?(\w+\b)`, lexer.Push("Heredoc")},
 			{"String", `"(\\\d\d\d|\\.|[^"])*"|'(\\\d\d\d|\\.|[^'])*'`, nil},
