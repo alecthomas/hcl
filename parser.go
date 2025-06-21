@@ -36,6 +36,7 @@ func (c *CommentList) Capture(values []string) error {
 // Node is the the interface implemented by all AST nodes.
 type Node interface {
 	Position() Position
+	EndPosition() Position
 	Detach() bool
 	children() (children []Node)
 }
@@ -56,6 +57,8 @@ func (e Entries) MarshalJSON() ([]byte, error) {
 			kind = "attribute"
 		case *Block:
 			kind = "block"
+		case *Comment:
+			continue
 		}
 		out = append(out, []byte(fmt.Sprintf(`{%q: %s}`, kind, raw)))
 	}
@@ -64,11 +67,12 @@ func (e Entries) MarshalJSON() ([]byte, error) {
 
 // AST for HCL.
 type AST struct {
-	Pos lexer.Position `parser:""`
+	Pos    lexer.Position `parser:""`
+	EndPos lexer.Position `parser:""`
 
-	Entries          Entries     `parser:"@@*"`
-	TrailingComments CommentList `parser:"@Comment*"`
-	Schema           bool        `parser:""`
+	Entries          Entries `parser:"@@*"`
+	TrailingComments CommentList
+	Schema           bool `parser:""`
 }
 
 func (a *AST) Detach() bool { return false }
@@ -80,6 +84,7 @@ func (a *AST) Clone() *AST {
 	}
 	out := &AST{
 		Pos:              a.Pos,
+		EndPos:           a.EndPos,
 		TrailingComments: cloneStrings(a.TrailingComments),
 		Schema:           a.Schema,
 	}
@@ -91,7 +96,8 @@ func (a *AST) Clone() *AST {
 	return out
 }
 
-func (a *AST) Position() Position { return a.Pos }
+func (a *AST) Position() Position    { return a.Pos }
+func (a *AST) EndPosition() Position { return a.EndPos }
 
 func (a *AST) children() (children []Node) {
 	for _, entry := range a.Entries {
@@ -112,6 +118,7 @@ type Entry interface {
 type RecursiveEntry struct{}
 
 func (*RecursiveEntry) Position() Position          { return Position{} }
+func (*RecursiveEntry) EndPosition() Position       { return Position{} }
 func (*RecursiveEntry) children() (children []Node) { return nil }
 func (*RecursiveEntry) Clone() Entry                { return &RecursiveEntry{} }
 func (*RecursiveEntry) Detach() bool                { return false }
@@ -122,9 +129,10 @@ var _ Entry = &RecursiveEntry{}
 // Attribute is a key=value attribute.
 type Attribute struct {
 	Pos    lexer.Position `parser:""`
+	EndPos lexer.Position `parser:""`
 	Parent Node           `parser:""`
 
-	Comments CommentList `parser:"@Comment*"`
+	Comments CommentList
 
 	Key   string `parser:"@Ident"`
 	Value Value  `parser:"( '=':Punct @@ )?"`
@@ -136,9 +144,10 @@ type Attribute struct {
 
 var _ Entry = &Attribute{}
 
-func (a *Attribute) Detach() bool       { return detachEntry(a.Parent, a) }
-func (a *Attribute) Position() Position { return a.Pos }
-func (a *Attribute) EntryKey() string   { return a.Key }
+func (a *Attribute) Detach() bool          { return detachEntry(a.Parent, a) }
+func (a *Attribute) Position() Position    { return a.Pos }
+func (a *Attribute) EndPosition() Position { return a.EndPos }
+func (a *Attribute) EntryKey() string      { return a.Key }
 func (a *Attribute) children() (children []Node) {
 	return []Node{a.Value, a.Default}
 }
@@ -153,6 +162,7 @@ func (a *Attribute) Clone() Entry {
 	}
 	return &Attribute{
 		Pos:      a.Pos,
+		EndPos:   a.EndPos,
 		Comments: cloneStrings(a.Comments),
 		Key:      a.Key,
 		Value:    a.Value.Clone(),
@@ -160,24 +170,54 @@ func (a *Attribute) Clone() Entry {
 	}
 }
 
+type Comment struct {
+	Pos    lexer.Position `parser:""`
+	EndPos lexer.Position `parser:""`
+	Parent Node           `parser:""`
+
+	Comments CommentList `parser:"@Comment"`
+}
+
+var _ Entry = &Comment{}
+
+func (a *Comment) Detach() bool          { return detachEntry(a.Parent, a) }
+func (a *Comment) Position() Position    { return a.Pos }
+func (a *Comment) EndPosition() Position { return a.EndPos }
+func (a *Comment) EntryKey() string      { return "" }
+func (a *Comment) children() []Node      { return nil }
+func (a *Comment) String() string        { return "" }
+
+// Clone the AST.
+func (a *Comment) Clone() Entry {
+	if a == nil {
+		return nil
+	}
+	return &Comment{
+		Pos:      a.Pos,
+		Comments: cloneStrings(a.Comments),
+	}
+}
+
 // Block represents am optionally labelled HCL block.
 type Block struct {
 	Pos    lexer.Position `parser:""`
+	EndPos lexer.Position `parser:""`
 	Parent Node           `parser:""`
 
-	Comments CommentList `parser:"@Comment*"`
+	Comments CommentList
 
 	Name     string   `parser:"@Ident"`
 	Repeated bool     `parser:"( '(' @'repeated' ')' )?"`
 	Labels   []string `parser:"@( Ident | String )*"`
-	Body     Entries  `parser:"'{' @@*"`
+	Body     Entries  `parser:"'{' @@* '}'"`
 
-	TrailingComments CommentList `parser:"@Comment* '}'"`
+	TrailingComments CommentList
 }
 
 var _ Entry = &Block{}
 
-func (b *Block) Position() Position { return b.Pos }
+func (b *Block) Position() Position    { return b.Pos }
+func (b *Block) EndPosition() Position { return b.EndPos }
 
 // EntryKey implements Entry
 func (b *Block) EntryKey() string { return b.Name }
@@ -201,6 +241,7 @@ func (b *Block) Clone() Entry {
 	}
 	out := &Block{
 		Pos:              b.Pos,
+		EndPos:           b.EndPos,
 		Comments:         cloneStrings(b.Comments),
 		Name:             b.Name,
 		Labels:           cloneStrings(b.Labels),
@@ -217,6 +258,7 @@ func (b *Block) Clone() Entry {
 // MapEntry represents a key+value in a map.
 type MapEntry struct {
 	Pos    lexer.Position `parser:""`
+	EndPos lexer.Position `parser:""`
 	Parent Node           `parser:""`
 
 	Comments []string `parser:"@Comment*"`
@@ -239,7 +281,8 @@ func (e *MapEntry) Detach() bool {
 	return false
 }
 
-func (e *MapEntry) Position() Position { return e.Pos }
+func (e *MapEntry) Position() Position    { return e.Pos }
+func (e *MapEntry) EndPosition() Position { return e.EndPos }
 
 func (e *MapEntry) children() (children []Node) {
 	return []Node{e.Key, e.Value}
@@ -252,6 +295,7 @@ func (e *MapEntry) Clone() *MapEntry {
 	}
 	return &MapEntry{
 		Pos:      e.Pos,
+		EndPos:   e.EndPos,
 		Key:      e.Key.Clone(),
 		Value:    e.Value.Clone(),
 		Comments: cloneStrings(e.Comments),
@@ -261,6 +305,7 @@ func (e *MapEntry) Clone() *MapEntry {
 // Bool represents a parsed boolean value.
 type Bool struct {
 	Pos    lexer.Position `parser:""`
+	EndPos lexer.Position `parser:""`
 	Parent Node           `parser:""`
 
 	Bool bool `parser:"@'true':Ident | 'false':Ident"`
@@ -269,7 +314,8 @@ type Bool struct {
 var _ Value = &Bool{}
 
 func (b *Bool) Detach() bool                { return false }
-func (b *Bool) Position() lexer.Position    { return b.Pos }
+func (b *Bool) Position() Position          { return b.Pos }
+func (b *Bool) EndPosition() Position       { return b.EndPos }
 func (b *Bool) children() (children []Node) { return nil }
 func (b *Bool) Clone() Value                { clone := *b; return &clone }
 func (b *Bool) String() string              { return strconv.FormatBool(b.Bool) }
@@ -282,6 +328,7 @@ var needsOctalPrefix = regexp.MustCompile(`^0\d+$`)
 // Number of arbitrary precision.
 type Number struct {
 	Pos    lexer.Position `parser:""`
+	EndPos lexer.Position `parser:""`
 	Parent Node           `parser:""`
 
 	Float *big.Float `parser:"@Number"`
@@ -290,7 +337,8 @@ type Number struct {
 var _ Value = &Number{}
 
 func (n *Number) Detach() bool                { return false }
-func (n *Number) Position() lexer.Position    { return n.Pos }
+func (n *Number) Position() Position          { return n.Pos }
+func (n *Number) EndPosition() Position       { return n.EndPos }
 func (n *Number) children() (children []Node) { return nil }
 func (n *Number) Clone() Value {
 	clone := *n
@@ -329,6 +377,7 @@ type Value interface {
 // Type of a Value.
 type Type struct {
 	Pos    lexer.Position `parser:""`
+	EndPos lexer.Position `parser:""`
 	Parent Node           `parser:""`
 
 	Type string `parser:"@('string':Ident | 'number':Ident | 'boolean':Ident)"`
@@ -340,12 +389,14 @@ func (t *Type) value()                      {}
 func (t *Type) Clone() Value                { clone := *t; return &clone }
 func (t *Type) String() string              { return t.Type }
 func (t *Type) Detach() bool                { return false }
-func (t *Type) Position() lexer.Position    { return t.Pos }
+func (t *Type) Position() Position          { return t.Pos }
+func (t *Type) EndPosition() Position       { return t.EndPos }
 func (t *Type) children() (children []Node) { return nil }
 
 // Call represents a function call.
 type Call struct {
 	Pos    lexer.Position `parser:""`
+	EndPos lexer.Position `parser:""`
 	Parent Node           `parser:""`
 
 	Args []Value `parser:"'(' @@ ( ',' @@ )* ')'"`
@@ -371,8 +422,9 @@ func (f *Call) String() string {
 	}
 	return fmt.Sprintf("(%s)", strings.Join(args, ", "))
 }
-func (f *Call) Detach() bool             { return false }
-func (f *Call) Position() lexer.Position { return f.Pos }
+func (f *Call) Detach() bool          { return false }
+func (f *Call) Position() Position    { return f.Pos }
+func (f *Call) EndPosition() Position { return f.EndPos }
 func (f *Call) children() (children []Node) {
 	out := make([]Node, len(f.Args))
 	for i, arg := range f.Args {
@@ -384,6 +436,7 @@ func (f *Call) children() (children []Node) {
 // String literal.
 type String struct {
 	Pos    lexer.Position `parser:""`
+	EndPos lexer.Position `parser:""`
 	Parent Node           `parser:""`
 
 	Str string `parser:"@(String | Ident)"`
@@ -394,13 +447,15 @@ var _ Value = &String{}
 func (s *String) Clone() Value                { clone := *s; return &clone }
 func (s *String) String() string              { return strconv.Quote(s.Str) }
 func (s *String) Detach() bool                { return false }
-func (s *String) Position() lexer.Position    { return s.Pos }
+func (s *String) Position() Position          { return s.Pos }
+func (s *String) EndPosition() Position       { return s.EndPos }
 func (s *String) children() (children []Node) { return nil }
 func (s *String) value()                      {}
 
 // Heredoc represents a heredoc string.
 type Heredoc struct {
 	Pos    lexer.Position `parser:""`
+	EndPos lexer.Position `parser:""`
 	Parent Node           `parser:""`
 
 	Delimiter string `parser:"(@Heredoc"`
@@ -415,7 +470,8 @@ func (h *Heredoc) String() string {
 }
 func (h *Heredoc) value()                      {}
 func (h *Heredoc) Detach() bool                { return false }
-func (h *Heredoc) Position() lexer.Position    { return h.Pos }
+func (h *Heredoc) Position() Position          { return h.Pos }
+func (h *Heredoc) EndPosition() Position       { return h.EndPos }
 func (h *Heredoc) children() (children []Node) { return nil }
 
 // GetHeredoc gets the heredoc as a string.
@@ -432,6 +488,7 @@ func (h *Heredoc) GetHeredoc() string {
 // A List of values.
 type List struct {
 	Pos    lexer.Position `parser:""`
+	EndPos lexer.Position `parser:""`
 	Parent Node           `parser:""`
 
 	List []Value `parser:"( '[' ( @@ ( ',' @@ )* )? ','? ']' )"`
@@ -462,13 +519,15 @@ func (l *List) String() string {
 var _ Value = &List{}
 
 func (l *List) Detach() bool                { return false }
-func (l *List) Position() lexer.Position    { return l.Pos }
+func (l *List) Position() Position          { return l.Pos }
+func (l *List) EndPosition() Position       { return l.EndPos }
 func (l *List) children() (children []Node) { return nil }
 func (l *List) value()                      {}
 
 // A Map of key to value.
 type Map struct {
 	Pos    lexer.Position `parser:""`
+	EndPos lexer.Position `parser:""`
 	Parent Node           `parser:""`
 
 	Entries []*MapEntry `parser:"( '{' ( @@ ( ',' @@ )* ','? )? '}' )"`
@@ -497,8 +556,9 @@ func (m *Map) String() string {
 
 var _ Value = &Map{}
 
-func (m *Map) Detach() bool             { return false }
-func (m *Map) Position() lexer.Position { return m.Pos }
+func (m *Map) Detach() bool          { return false }
+func (m *Map) Position() Position    { return m.Pos }
+func (m *Map) EndPosition() Position { return m.EndPos }
 func (m *Map) children() (children []Node) {
 	for _, entry := range m.Entries {
 		children = append(children, entry)
@@ -515,7 +575,7 @@ var (
 			{"Heredoc", `<<[-]?(\w+\b)`, lexer.Push("Heredoc")},
 			{"String", `"(\\\d\d\d|\\.|[^"])*"|'(\\\d\d\d|\\.|[^'])*'`, nil},
 			{"Punct", `[][*?{}=:,()|]`, nil},
-			{"Comment", `(?:(?://|#)[^\n]*(?:\n\s*(?://|#)[^\n]*)*)|/\*.*?\*/`, nil},
+			{"Comment", `(?:(?://|#)[^\n]*(?:\n[ \t]*(?://|#)[^\n]*)*)|/\*.*?\*/`, nil},
 			{"Whitespace", `\s+`, nil},
 		},
 		"Heredoc": {
@@ -531,7 +591,7 @@ var (
 		participle.Map(cleanHeredocStart, "Heredoc"),
 		participle.Map(stripComment, "Comment"),
 		participle.Elide("Whitespace"),
-		participle.Union[Entry](&Block{}, &Attribute{}),
+		participle.Union[Entry](&Block{}, &Attribute{}, &Comment{}),
 		participle.Union[Value](&Bool{}, &Type{}, &String{}, &Number{}, &List{}, &Map{}, &Heredoc{}),
 		// We need lookahead to ensure prefixed comments are associated with the right nodes.
 		participle.UseLookahead(50))
@@ -576,31 +636,197 @@ func cleanHeredocStart(token lexer.Token) (lexer.Token, error) {
 	return token, nil
 }
 
+// ParseOption represents a functional option for Parse, ParseString, and ParseBytes.
+type ParseOption func(*parseConfig)
+
+// parseConfig holds the configuration for parsing.
+type parseConfig struct {
+	detachedComments bool
+}
+
+// WithDetachedComments controls whether comments that are not directly associated with a
+// block or attribute are preserved in the AST.
+// If set to false (default), detached comments will be stripped from the AST during post-processing.
+// If set to true, detached comments will be preserved as separate entries in the AST.
+func WithDetachedComments(preserve bool) ParseOption {
+	return func(config *parseConfig) {
+		config.detachedComments = preserve
+	}
+}
+
 // Parse HCL from an io.Reader.
-func Parse(r io.Reader) (*AST, error) {
+func Parse(r io.Reader, options ...ParseOption) (*AST, error) {
+	config := &parseConfig{}
+	for _, option := range options {
+		option(config)
+	}
+
 	hcl, err := parser.Parse("", r)
 	if err != nil {
 		return nil, err
 	}
-	return hcl, AddParentRefs(hcl)
+
+	return config.postProccessAST(hcl)
 }
 
 // ParseString parses HCL from a string.
-func ParseString(str string) (*AST, error) {
+func ParseString(str string, options ...ParseOption) (*AST, error) {
+	config := &parseConfig{}
+	for _, option := range options {
+		option(config)
+	}
+
 	hcl, err := parser.ParseString("", str)
 	if err != nil {
 		return nil, err
 	}
-	return hcl, AddParentRefs(hcl)
+
+	return config.postProccessAST(hcl)
 }
 
 // ParseBytes parses HCL from bytes.
-func ParseBytes(data []byte) (*AST, error) {
+func ParseBytes(data []byte, options ...ParseOption) (*AST, error) {
+	config := &parseConfig{}
+	for _, option := range options {
+		option(config)
+	}
+
 	hcl, err := parser.ParseBytes("", data)
 	if err != nil {
 		return nil, err
 	}
-	return hcl, AddParentRefs(hcl)
+
+	return config.postProccessAST(hcl)
+}
+
+func (config *parseConfig) postProccessAST(hcl *AST) (*AST, error) {
+	err := AddParentRefs(hcl)
+	if err != nil {
+		return nil, err
+	}
+
+	// Always process comments to attach them appropriately
+	err = populateAttachedComments(hcl)
+	if err != nil {
+		return nil, err
+	}
+
+	err = populateTrailingComments(hcl)
+	if err != nil {
+		return nil, err
+	}
+
+	if !config.detachedComments {
+		err = stripDetachedComments(hcl)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return hcl, nil
+}
+
+// populateAttachedComments moves immediately adjacent comments to their following entries.
+// Comments that immediately precede a block/attribute (without blank lines) are "attached" and
+// should be moved to the Comments field of that block/attribute. Comments separated by blank lines
+// remain as standalone ("detached") Comment entries.
+func populateAttachedComments(ast *AST) error {
+	populateAttachedCommentsInEntries(&ast.Entries)
+
+	return visitBlocks(ast, func(block *Block) error {
+		populateAttachedCommentsInEntries(&block.Body)
+		return nil
+	})
+}
+
+// populateAttachedCommentsInEntries processes a slice of entries to handle attached vs detached comments
+func populateAttachedCommentsInEntries(entries *Entries) {
+	if entries == nil || len(*entries) == 0 {
+		return
+	}
+
+	newEntries := make(Entries, 0, len(*entries))
+
+	for i, entry := range *entries {
+		if comment, ok := entry.(*Comment); ok {
+			// Check if next entry exists and is immediately adjacent
+			if i+1 < len(*entries) {
+				nextEntry := (*entries)[i+1]
+				if nextEntry.Position().Line == comment.EndPosition().Line+1 {
+					switch e := nextEntry.(type) {
+					case *Block:
+						e.Comments = append(e.Comments, comment.Comments...)
+					case *Attribute:
+						e.Comments = append(e.Comments, comment.Comments...)
+					}
+					continue // Skip adding as standalone
+				}
+			}
+		}
+
+		newEntries = append(newEntries, entry)
+	}
+
+	*entries = newEntries
+}
+
+// populateTrailingComments copies trailing comments from Comment nodes to TrailingComments fields.
+func populateTrailingComments(ast *AST) error {
+	populateTrailingCommentsInEntries(&ast.Entries, &ast.TrailingComments)
+
+	return visitBlocks(ast, func(block *Block) error {
+		populateTrailingCommentsInEntries(&block.Body, &block.TrailingComments)
+		return nil
+	})
+}
+
+// populateTrailingCommentsInEntries finds trailing Comment nodes and copies their comments
+func populateTrailingCommentsInEntries(entries *Entries, trailingComments *CommentList) {
+	if entries == nil || len(*entries) == 0 {
+		return
+	}
+
+	// Only the very last entry should be considered a trailing comment
+	// (not all comments after the last non-comment entry)
+	lastIndex := len(*entries) - 1
+	if lastIndex >= 0 {
+		if comment, ok := (*entries)[lastIndex].(*Comment); ok {
+			*trailingComments = append(*trailingComments, comment.Comments...)
+			// Remove the trailing comment from entries
+			*entries = (*entries)[:lastIndex]
+		}
+	}
+}
+
+// stripDetachedComments removes all Comment nodes from the AST recursively.
+func stripDetachedComments(ast *AST) error {
+	stripCommentsFromEntries(&ast.Entries)
+
+	return visitBlocks(ast, func(block *Block) error {
+		stripCommentsFromEntries(&block.Body)
+		return nil
+	})
+}
+
+// stripCommentsFromEntries removes Comment entries from a slice of entries.
+func stripCommentsFromEntries(entries *Entries) {
+	filtered := make(Entries, 0, len(*entries))
+	for _, entry := range *entries {
+		if _, isComment := entry.(*Comment); !isComment {
+			filtered = append(filtered, entry)
+		}
+	}
+	*entries = filtered
+}
+
+// visitBlocks yields each block in the AST recursively.
+func visitBlocks(ast *AST, visitor func(*Block) error) error {
+	return Visit(ast, func(node Node, next func() error) error {
+		if block, ok := node.(*Block); ok {
+			visitor(block)
+		}
+		return next()
+	})
 }
 
 func cloneStrings(strings []string) []string {

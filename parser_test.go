@@ -229,11 +229,15 @@ EOF
 					  // trailing comment
 					}
 				`,
-			expected: hcl(&Block{
-				Name:             "block",
-				Body:             []Entry{attr("attr", hbool(false))},
-				TrailingComments: []string{"trailing comment"},
-			}),
+			expected: hcl(
+				&Block{
+					Name: "block",
+					Body: []Entry{
+						attr("attr", hbool(false)),
+					},
+					TrailingComments: []string{"trailing comment"},
+				},
+			),
 		},
 		{name: "EmptyList",
 			hcl:      `a = []`,
@@ -243,7 +247,43 @@ EOF
 					a = true
 					// trailing comment
 				`,
-			expected: trailingComments(hcl(attr("a", hbool(true))), "trailing comment")},
+			expected: &AST{
+				Entries: []Entry{
+					attr("a", hbool(true)),
+				},
+				TrailingComments: []string{"trailing comment"},
+			}},
+		{name: "DetachedComments",
+			hcl: `
+					// detached comment 1
+
+					// detached comment 2 (independent of detached comment 1)
+
+					// attached comment (attached to following block)
+					block {}
+
+					// detached comment 3 (not attached to either the preceding or following block)
+
+					block {}
+
+					// detached comment 4 (not attached to either the preceding block or following comment)
+
+					// trailing AST comment (not attached to preceding block)
+				`,
+			expected: &AST{
+				Entries: []Entry{
+					&Comment{Comments: []string{"detached comment 1"}},
+					&Comment{Comments: []string{"detached comment 2 (independent of detached comment 1)"}},
+					&Block{
+						Name:     "block",
+						Comments: []string{"attached comment (attached to following block)"},
+					},
+					&Comment{Comments: []string{"detached comment 3 (not attached to either the preceding or following block)"}},
+					&Block{Name: "block"},
+					&Comment{Comments: []string{"detached comment 4 (not attached to either the preceding block or following comment)"}},
+				},
+				TrailingComments: []string{"trailing AST comment (not attached to preceding block)"},
+			}},
 		{name: "AttributeWithoutValue",
 			hcl: `
 				attr
@@ -270,7 +310,7 @@ EOF
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			hcl, err := ParseString(test.hcl)
+			hcl, err := ParseString(test.hcl, WithDetachedComments(true))
 			if test.fail {
 				assert.Error(t, err)
 			} else {
@@ -307,19 +347,27 @@ func normaliseAST(hcl *AST) {
 		return
 	}
 	hcl.Pos = lexer.Position{}
+	hcl.EndPos = lexer.Position{}
 	normaliseEntries(hcl.Entries)
 }
 
 func normaliseEntries(entries []Entry) {
 	for _, entry := range entries {
 		switch entry := entry.(type) {
+		case *Comment:
+			entry.Pos = lexer.Position{}
+			entry.EndPos = lexer.Position{}
+			entry.Parent = nil
+
 		case *Block:
 			entry.Pos = lexer.Position{}
+			entry.EndPos = lexer.Position{}
 			entry.Parent = nil
 			normaliseEntries(entry.Body)
 
 		case *Attribute:
 			entry.Pos = lexer.Position{}
+			entry.EndPos = lexer.Position{}
 			entry.Parent = nil
 			val := entry.Value
 			normaliseValue(val)
@@ -338,12 +386,14 @@ func normaliseValue(val Value) {
 	}
 	rv = reflect.Indirect(rv)
 	rv.FieldByName("Pos").Set(reflect.ValueOf(lexer.Position{}))
+	rv.FieldByName("EndPos").Set(reflect.ValueOf(lexer.Position{}))
 	parent := rv.FieldByName("Parent")
 	parent.Set(reflect.Zero(parent.Type()))
 	switch val := val.(type) {
 	case *Map:
 		for _, entry := range val.Entries {
 			entry.Pos = lexer.Position{}
+			entry.EndPos = lexer.Position{}
 			entry.Parent = nil
 			normaliseValue(entry.Key)
 			normaliseValue(entry.Value)
@@ -372,11 +422,6 @@ func hcl(entries ...Entry) *AST {
 	return &AST{Entries: entries}
 }
 
-func trailingComments(ast *AST, comments ...string) *AST {
-	ast.TrailingComments = comments
-	return ast
-}
-
 func block(name string, labels []string, entries ...Entry) Entry {
 	return &Block{
 		Name:   name,
@@ -399,4 +444,78 @@ func num(n float64) Value {
 	// b, _, _ := big.ParseFloat(s, 10, 64, 0)
 	_, _, _ = b.Parse(s, 0)
 	return &Number{Float: b}
+}
+
+func TestFunctionalOptions(t *testing.T) {
+	hclContent := `
+		// An attached comment
+		attr = "value"
+		
+		// a detached comment
+
+		block {}
+	`
+
+	t.Run("DefaultBehavior", func(t *testing.T) {
+		expected :=
+			hcl(
+				&Attribute{
+					Key:      "attr",
+					Value:    str("value"),
+					Comments: []string{"An attached comment"},
+				},
+				&Block{
+					Name: "block",
+				},
+			)
+
+		// Test default behavior (comments stripped)
+		ast, err := ParseString(hclContent)
+		assert.NoError(t, err)
+		normaliseAST(ast)
+		assert.Equal(t, expected, ast)
+	})
+
+	t.Run("WithDetachedComments", func(t *testing.T) {
+		expected :=
+			hcl(
+				&Attribute{
+					Key:      "attr",
+					Value:    str("value"),
+					Comments: []string{"An attached comment"},
+				},
+				&Comment{
+					Comments: []string{"a detached comment"},
+				},
+				&Block{
+					Name: "block",
+				},
+			)
+
+		// Test with detached comments enabled
+		ast, err := ParseString(hclContent, WithDetachedComments(true))
+		assert.NoError(t, err)
+		normaliseAST(ast)
+		assert.Equal(t, expected, ast)
+	})
+
+	t.Run("WithDetachedCommentsFalse", func(t *testing.T) {
+		expected :=
+			hcl(
+				&Attribute{
+					Key:      "attr",
+					Value:    str("value"),
+					Comments: []string{"An attached comment"},
+				},
+				&Block{
+					Name: "block",
+				},
+			)
+
+		// Test explicitly setting detached comments to false
+		ast, err := ParseString(hclContent, WithDetachedComments(false))
+		assert.NoError(t, err)
+		normaliseAST(ast)
+		assert.Equal(t, expected, ast)
+	})
 }
