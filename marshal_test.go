@@ -451,6 +451,38 @@ func TestMarshalAST(t *testing.T) {
 				TrailingComments: []string{"trailing comment"},
 			}),
 		},
+		{
+			name: "BlockWithDetachedCommentsAheadOfIt",
+			expected: `// detached comment 1
+
+// detached comment 2 (independent of detached comment 1)
+
+// attached comment (attached to following block)
+block {}
+
+// detached comment 3 (not attached to either the preceding or following block)
+
+block {}
+
+// detached comment 4 (not attached to either the preceding block or following comment)
+
+// trailing AST comment (not attached to preceding block)
+`,
+			ast: &AST{
+				Entries: []Entry{
+					&Comment{Comments: []string{"detached comment 1"}},
+					&Comment{Comments: []string{"detached comment 2 (independent of detached comment 1)"}},
+					&Block{
+						Name:     "block",
+						Comments: []string{"attached comment (attached to following block)"},
+					},
+					&Comment{Comments: []string{"detached comment 3 (not attached to either the preceding or following block)"}},
+					&Block{Name: "block"},
+					&Comment{Comments: []string{"detached comment 4 (not attached to either the preceding block or following comment)"}},
+				},
+				TrailingComments: []string{"trailing AST comment (not attached to preceding block)"},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

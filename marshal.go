@@ -545,6 +545,9 @@ func marshalNode(w io.Writer, indent string, node Node) error {
 		return marshalBlock(w, indent, node)
 	case *Attribute:
 		return marshalAttribute(w, indent, node)
+	case *Comment:
+		marshalComments(w, indent, node.Comments)
+		return nil
 	case Value:
 		return marshalValue(w, indent, node)
 	default:
@@ -552,17 +555,21 @@ func marshalNode(w io.Writer, indent string, node Node) error {
 	}
 }
 
-func marshalAST(w io.Writer, indent string, node *AST) error {
-	err := marshalEntries(w, indent, node.Entries)
+func marshalAST(w io.Writer, indent string, ast *AST) error {
+	err := marshalEntries(w, indent, ast.Entries)
 	if err != nil {
 		return err
 	}
-	marshalComments(w, indent, node.TrailingComments)
+
+	if len(ast.TrailingComments) > 0 {
+		fmt.Fprintln(w)
+	}
+	marshalComments(w, indent, ast.TrailingComments)
 	return nil
 }
 
 func marshalEntries(w io.Writer, indent string, entries []Entry) error {
-	prevAttr := true
+	prevAttr := false
 	for i, entry := range entries {
 		switch entry := entry.(type) {
 		case *Block:
@@ -575,7 +582,7 @@ func marshalEntries(w io.Writer, indent string, entries []Entry) error {
 			prevAttr = false
 
 		case *Attribute:
-			if !prevAttr {
+			if i > 0 && !prevAttr {
 				fmt.Fprintln(w)
 			}
 			if err := marshalAttribute(w, indent, entry); err != nil {
@@ -583,8 +590,16 @@ func marshalEntries(w io.Writer, indent string, entries []Entry) error {
 			}
 			prevAttr = true
 
+		case *Comment:
+			if i > 0 {
+				fmt.Fprintln(w)
+			}
+			marshalComments(w, indent, entry.Comments)
+			prevAttr = false
+
 		case *RecursiveEntry:
 			fmt.Fprintf(w, "%s// (recursive)\n", indent)
+			prevAttr = false
 
 		default:
 			panic("??")
@@ -700,6 +715,7 @@ func marshalBlock(w io.Writer, indent string, block *Block) error {
 	if err != nil {
 		return err
 	}
+
 	// Marshal trailing comments before closing brace
 	if len(block.TrailingComments) > 0 {
 		if len(block.Body) > 0 {
@@ -707,6 +723,7 @@ func marshalBlock(w io.Writer, indent string, block *Block) error {
 		}
 		marshalComments(w, indent+"  ", block.TrailingComments)
 	}
+
 	fmt.Fprintf(w, "%s}\n", indent)
 	return nil
 }
