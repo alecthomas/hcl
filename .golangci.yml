@@ -63,6 +63,9 @@ linters:
     - forcetypeassert
     - errcheck
     - errorlint
+    - wsl_v5
+    - noinlineerr
+    - embeddedstructfieldcheck
 
   settings:
     wrapcheck:
