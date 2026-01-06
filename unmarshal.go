@@ -355,6 +355,31 @@ func unmarshalBlock(v reflect.Value, block *Block, opt *marshalState) error {
 }
 
 func unmarshalValue(rv reflect.Value, v Value, opt *marshalState) error {
+	switch rv.Type() {
+	case durationType:
+		s, ok := v.(*String)
+		if !ok {
+			return participle.Errorf(v.Position(), "duration value must be a string")
+		}
+		d, err := time.ParseDuration(s.Str)
+		if err != nil {
+			return participle.Errorf(v.Position(), "invalid duration value %q", s.Str)
+		}
+		rv.Set(reflect.ValueOf(d))
+		return nil
+
+	case timeType:
+		s, ok := v.(*String)
+		if !ok {
+			return participle.Errorf(v.Position(), "time value must be a string in RFC3339 format")
+		}
+		t, err := time.Parse(time.RFC3339, s.Str)
+		if err != nil {
+			return participle.Errorf(v.Position(), "invalid time value %q", s.Str)
+		}
+		rv.Set(reflect.ValueOf(t))
+		return nil
+	}
 	switch rv.Kind() {
 	case reflect.String:
 		switch v := v.(type) {
