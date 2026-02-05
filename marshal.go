@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"os"
 	"reflect"
 	"regexp"
 	"sort"
@@ -27,7 +26,7 @@ type marshalState struct {
 	schemaComments       bool
 	seenStructs          map[reflect.Type]bool
 	allowExtra           bool
-	variableExpander     func(string) string
+	defaultTransformer   func(string) string
 }
 
 // Create a shallow clone with schema overridden.
@@ -86,14 +85,10 @@ func WithSchemaComments(v bool) MarshalOption {
 	}
 }
 
-func WithVariableExpansion(vars map[string]string) MarshalOption {
+// WithDefaultTransformer allows custom processing of default values in struct tags.
+func WithDefaultTransformer(transformer func(string) string) MarshalOption {
 	return func(options *marshalState) {
-		options.variableExpander = func(key string) string {
-			if val, ok := vars[key]; ok {
-				return val
-			}
-			return os.Getenv(key)
-		}
+		options.defaultTransformer = transformer
 	}
 }
 
@@ -320,8 +315,8 @@ func valueFromTag(f field, defaultValue string, opt *marshalState) (Value, error
 		return nil, nil // nolint: nilnil
 	}
 
-	if opt != nil && opt.variableExpander != nil {
-		defaultValue = os.Expand(defaultValue, opt.variableExpander)
+	if opt != nil && opt.defaultTransformer != nil {
+		defaultValue = opt.defaultTransformer(defaultValue)
 	}
 
 	k := f.v.Kind()

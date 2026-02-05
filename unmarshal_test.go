@@ -3,6 +3,7 @@ package hcl
 import (
 	"fmt"
 	"net"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -1103,68 +1104,86 @@ func TestUnmarshallInterfaces(t *testing.T) {
 	runTests(t, tests)
 }
 
-func TestWithVariableExpansion(t *testing.T) {
-	type TestConfig struct {
-		BaseURL string `hcl:"base-url,optional" default:"${BASE_URL}/api/v1"`
-		Port    int    `hcl:"port,optional" default:"${PORT}"`
-		Debug   bool   `hcl:"debug,optional" default:"${DEBUG}"`
+func TestWithDefaultTransformer(t *testing.T) {
+	expandVars := func(vars map[string]string) func(string) string {
+		return func(defaultValue string) string {
+			return os.Expand(defaultValue, func(key string) string {
+				if val, ok := vars[key]; ok {
+					return val
+				}
+				return os.Getenv(key)
+			})
+		}
 	}
 
-	vars := map[string]string{
-		"BASE_URL": "https://api.example.com",
-		"PORT":     "8080",
-		"DEBUG":    "true",
-	}
-
-	// Empty HCL block - should get defaults with expanded variables
-	block := &Block{
-		Name: "test",
-		Body: []Entry{}, // Empty body
-	}
-
-	var config TestConfig
-	err := UnmarshalBlock(block, &config, WithVariableExpansion(vars))
-	assert.NoError(t, err)
-
-	assert.Equal(t, "https://api.example.com/api/v1", config.BaseURL)
-	assert.Equal(t, 8080, config.Port)
-	assert.Equal(t, true, config.Debug)
-
-	type ComplexConfig struct {
-		APIEndpoint string `hcl:"api-endpoint,optional" default:"https://${HOST}:${PORT}/api"`
-	}
-
-	complexVars := map[string]string{
-		"HOST": "api.service.com",
-		"PORT": "8443",
-	}
-
-	var complexConfig ComplexConfig
-	err = UnmarshalBlock(&Block{Name: "test", Body: []Entry{}}, &complexConfig,
-		WithVariableExpansion(complexVars))
-	assert.NoError(t, err)
-	assert.Equal(t, "https://api.service.com:8443/api", complexConfig.APIEndpoint)
-
-	type UndefinedConfig struct {
-		Value  string `hcl:"value,optional" default:"prefix_${UNDEFINED_VAR}_suffix"`
-		Simple string `hcl:"simple,optional" default:"${TOTALLY_UNDEFINED}"`
-	}
-
-	var undefinedConfig UndefinedConfig
-	err = UnmarshalBlock(&Block{Name: "test", Body: []Entry{}}, &undefinedConfig,
-		WithVariableExpansion(map[string]string{}))
-	assert.NoError(t, err)
-	assert.Equal(t, "prefix__suffix", undefinedConfig.Value)
-	assert.Equal(t, "", undefinedConfig.Simple)
 	t.Setenv("FALLBACK_VAR", "fallback-value")
 
-	type FallbackConfig struct {
-		Value string `hcl:"value,optional" default:"${FALLBACK_VAR}"`
+	tests := []test{
+		{
+			name: "shell-style variable expansion",
+			hcl:  ``,
+			dest: struct {
+				BaseURL string `hcl:"base-url,optional" default:"${BASE_URL}/api/v1"`
+			}{
+				BaseURL: "https://api.example.com/api/v1",
+			},
+			options: []MarshalOption{WithDefaultTransformer(expandVars(map[string]string{
+				"BASE_URL": "https://api.example.com",
+			}))},
+		},
+		{
+			name: "custom template syntax",
+			hcl:  ``,
+			dest: struct {
+				Message string `hcl:"message,optional" default:"Hello {{NAME}}!"`
+			}{
+				Message: "Hello World!",
+			},
+			options: []MarshalOption{WithDefaultTransformer(func(s string) string {
+				if s == "Hello {{NAME}}!" {
+					return "Hello World!"
+				}
+				return s
+			})},
+		},
+		{
+			name: "string replacement",
+			hcl:  ``,
+			dest: struct {
+				Path string `hcl:"path,optional" default:"__HOME__/config"`
+			}{
+				Path: "/home/user/config",
+			},
+			options: []MarshalOption{WithDefaultTransformer(func(s string) string {
+				if s == "__HOME__/config" {
+					return "/home/user/config"
+				}
+				return s
+			})},
+		},
+		{
+			name: "prefix addition",
+			hcl:  ``,
+			dest: struct {
+				Topic string `hcl:"topic,optional" default:"events"`
+			}{
+				Topic: "prod.events",
+			},
+			options: []MarshalOption{WithDefaultTransformer(func(s string) string {
+				return "prod." + s
+			})},
+		},
+		{
+			name: "environment variable fallback",
+			hcl:  ``,
+			dest: struct {
+				Value string `hcl:"value,optional" default:"${FALLBACK_VAR}"`
+			}{
+				Value: "fallback-value",
+			},
+			options: []MarshalOption{WithDefaultTransformer(expandVars(map[string]string{}))},
+		},
 	}
 
-	var fallbackConfig FallbackConfig
-	err = UnmarshalBlock(&Block{Name: "test", Body: []Entry{}}, &fallbackConfig,
-		WithVariableExpansion(map[string]string{}))
-	assert.NoError(t, err)
-	assert.Equal(t, "fallback-value", fallbackConfig.Value)
+	runTests(t, tests)
 }
