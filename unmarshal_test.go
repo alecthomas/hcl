@@ -3,6 +3,7 @@ package hcl
 import (
 	"fmt"
 	"net"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -1100,5 +1101,89 @@ func TestUnmarshallInterfaces(t *testing.T) {
 			fail: "2:19: expected an attribute for \"block\" but got a block",
 		},
 	}
+	runTests(t, tests)
+}
+
+func TestWithDefaultTransformer(t *testing.T) {
+	expandVars := func(vars map[string]string) func(string) string {
+		return func(defaultValue string) string {
+			return os.Expand(defaultValue, func(key string) string {
+				if val, ok := vars[key]; ok {
+					return val
+				}
+				return os.Getenv(key)
+			})
+		}
+	}
+
+	t.Setenv("FALLBACK_VAR", "fallback-value")
+
+	tests := []test{
+		{
+			name: "shell-style variable expansion",
+			hcl:  ``,
+			dest: struct {
+				BaseURL string `hcl:"base-url,optional" default:"${BASE_URL}/api/v1"`
+			}{
+				BaseURL: "https://api.example.com/api/v1",
+			},
+			options: []MarshalOption{WithDefaultTransformer(expandVars(map[string]string{
+				"BASE_URL": "https://api.example.com",
+			}))},
+		},
+		{
+			name: "custom template syntax",
+			hcl:  ``,
+			dest: struct {
+				Message string `hcl:"message,optional" default:"Hello {{NAME}}!"`
+			}{
+				Message: "Hello World!",
+			},
+			options: []MarshalOption{WithDefaultTransformer(func(s string) string {
+				if s == "Hello {{NAME}}!" {
+					return "Hello World!"
+				}
+				return s
+			})},
+		},
+		{
+			name: "string replacement",
+			hcl:  ``,
+			dest: struct {
+				Path string `hcl:"path,optional" default:"__HOME__/config"`
+			}{
+				Path: "/home/user/config",
+			},
+			options: []MarshalOption{WithDefaultTransformer(func(s string) string {
+				if s == "__HOME__/config" {
+					return "/home/user/config"
+				}
+				return s
+			})},
+		},
+		{
+			name: "prefix addition",
+			hcl:  ``,
+			dest: struct {
+				Topic string `hcl:"topic,optional" default:"events"`
+			}{
+				Topic: "prod.events",
+			},
+			options: []MarshalOption{WithDefaultTransformer(func(s string) string {
+				return "prod." + s
+			})},
+		},
+		{
+			name: "environment variable fallback",
+			hcl:  ``,
+			dest: struct {
+				Value string `hcl:"value,optional" default:"${FALLBACK_VAR}"`
+			}{
+				Value: "fallback-value",
+			},
+			options: []MarshalOption{WithDefaultTransformer(expandVars(map[string]string{}))},
+		},
+	}
+
 	runTests(t, tests)
 }

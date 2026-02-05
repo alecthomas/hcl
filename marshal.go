@@ -26,6 +26,7 @@ type marshalState struct {
 	schemaComments       bool
 	seenStructs          map[reflect.Type]bool
 	allowExtra           bool
+	defaultTransformer   func(string) string
 }
 
 // Create a shallow clone with schema overridden.
@@ -81,6 +82,13 @@ func AllowExtra(ok bool) MarshalOption {
 func WithSchemaComments(v bool) MarshalOption {
 	return func(options *marshalState) {
 		options.schemaComments = v
+	}
+}
+
+// WithDefaultTransformer allows custom processing of default values in struct tags.
+func WithDefaultTransformer(transformer func(string) string) MarshalOption {
+	return func(options *marshalState) {
+		options.defaultTransformer = transformer
 	}
 }
 
@@ -264,17 +272,17 @@ func fieldToAttr(field field, tag tag, opt *marshalState) (*Attribute, error) {
 	if err != nil {
 		return nil, err
 	}
-	attr.Default, err = defaultValueFromTag(field, tag.defaultValue)
+	attr.Default, err = defaultValueFromTag(field, tag.defaultValue, opt)
 	if err != nil {
 		return nil, err
 	}
 	attr.Optional = (tag.optional || attr.Default != nil) && opt.schema
-	attr.Enum, err = enumValuesFromTag(field, tag.enum)
+	attr.Enum, err = enumValuesFromTag(field, tag.enum, opt)
 	return attr, err
 }
 
-func defaultValueFromTag(f field, defaultValue string) (Value, error) {
-	v, err := valueFromTag(f, defaultValue)
+func defaultValueFromTag(f field, defaultValue string, opt *marshalState) (Value, error) {
+	v, err := valueFromTag(f, defaultValue, opt)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing default value: %v", err)
 	}
@@ -282,7 +290,7 @@ func defaultValueFromTag(f field, defaultValue string) (Value, error) {
 }
 
 // enumValuesFromTag parses the enum string from tag into a list of Values
-func enumValuesFromTag(f field, enum string) ([]Value, error) {
+func enumValuesFromTag(f field, enum string, opt *marshalState) ([]Value, error) {
 	if enum == "" {
 		return nil, nil
 	}
@@ -290,7 +298,7 @@ func enumValuesFromTag(f field, enum string) ([]Value, error) {
 	enums := strings.Split(enum, ",")
 	list := make([]Value, 0, len(enums))
 	for _, e := range enums {
-		enumVal, err := valueFromTag(f, e)
+		enumVal, err := valueFromTag(f, e, opt)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing enum: %v", err)
 		}
@@ -302,9 +310,13 @@ func enumValuesFromTag(f field, enum string) ([]Value, error) {
 
 }
 
-func valueFromTag(f field, defaultValue string) (Value, error) {
+func valueFromTag(f field, defaultValue string, opt *marshalState) (Value, error) {
 	if defaultValue == "" {
 		return nil, nil // nolint: nilnil
+	}
+
+	if opt != nil && opt.defaultTransformer != nil {
+		defaultValue = opt.defaultTransformer(defaultValue)
 	}
 
 	k := f.v.Kind()
@@ -372,7 +384,7 @@ func valueFromTag(f field, defaultValue string) (Value, error) {
 				t: reflect.StructField{},
 				v: reflect.New(valueType),
 			}
-			val, err := defaultValueFromTag(valueField, v)
+			val, err := defaultValueFromTag(valueField, v, opt)
 			if err != nil {
 				return nil, fmt.Errorf("error parsing map %q into value, %v", v, err)
 			}
@@ -406,7 +418,7 @@ func valueFromTag(f field, defaultValue string) (Value, error) {
 			v: reflect.New(valueType),
 		}
 		for _, item := range list {
-			value, err := defaultValueFromTag(valueField, item)
+			value, err := defaultValueFromTag(valueField, item, opt)
 			if err != nil {
 				return nil, fmt.Errorf("error applying %q to list: %v", item, err)
 			}
