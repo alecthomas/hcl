@@ -129,7 +129,7 @@ func unmarshalEntries(v reflect.Value, entries []Entry, opt *marshalState) error
 				return fmt.Errorf("missing required attribute %q", tag.name)
 			}
 			// apply defaults here as there's no value for this field
-			v, err := defaultValueFromTag(field, tag.defaultValue)
+			v, err := defaultValueFromTag(field, tag.defaultValue, opt)
 			if err != nil {
 				return err
 			}
@@ -297,7 +297,7 @@ func checkEnum(v Value, f field, enum string) error {
 	case reflect.Map, reflect.Struct, reflect.Array, reflect.Slice:
 		return fmt.Errorf("enum on map, struct, array and slice are not supported on field %q", f.t.Name)
 	default:
-		enums, err := enumValuesFromTag(f, enum)
+		enums, err := enumValuesFromTag(f, enum, nil)
 		if err != nil {
 			return err
 		}

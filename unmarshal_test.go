@@ -1102,3 +1102,69 @@ func TestUnmarshallInterfaces(t *testing.T) {
 	}
 	runTests(t, tests)
 }
+
+func TestWithVariableExpansion(t *testing.T) {
+	type TestConfig struct {
+		BaseURL string `hcl:"base-url,optional" default:"${BASE_URL}/api/v1"`
+		Port    int    `hcl:"port,optional" default:"${PORT}"`
+		Debug   bool   `hcl:"debug,optional" default:"${DEBUG}"`
+	}
+
+	vars := map[string]string{
+		"BASE_URL": "https://api.example.com",
+		"PORT":     "8080",
+		"DEBUG":    "true",
+	}
+
+	// Empty HCL block - should get defaults with expanded variables
+	block := &Block{
+		Name: "test",
+		Body: []Entry{}, // Empty body
+	}
+
+	var config TestConfig
+	err := UnmarshalBlock(block, &config, WithVariableExpansion(vars))
+	assert.NoError(t, err)
+
+	assert.Equal(t, "https://api.example.com/api/v1", config.BaseURL)
+	assert.Equal(t, 8080, config.Port)
+	assert.Equal(t, true, config.Debug)
+
+	type ComplexConfig struct {
+		APIEndpoint string `hcl:"api-endpoint,optional" default:"https://${HOST}:${PORT}/api"`
+	}
+
+	complexVars := map[string]string{
+		"HOST": "api.service.com",
+		"PORT": "8443",
+	}
+
+	var complexConfig ComplexConfig
+	err = UnmarshalBlock(&Block{Name: "test", Body: []Entry{}}, &complexConfig,
+		WithVariableExpansion(complexVars))
+	assert.NoError(t, err)
+	assert.Equal(t, "https://api.service.com:8443/api", complexConfig.APIEndpoint)
+
+	type UndefinedConfig struct {
+		Value  string `hcl:"value,optional" default:"prefix_${UNDEFINED_VAR}_suffix"`
+		Simple string `hcl:"simple,optional" default:"${TOTALLY_UNDEFINED}"`
+	}
+
+	var undefinedConfig UndefinedConfig
+	err = UnmarshalBlock(&Block{Name: "test", Body: []Entry{}}, &undefinedConfig,
+		WithVariableExpansion(map[string]string{}))
+	assert.NoError(t, err)
+	assert.Equal(t, "prefix__suffix", undefinedConfig.Value)
+	assert.Equal(t, "", undefinedConfig.Simple)
+	t.Setenv("FALLBACK_VAR", "fallback-value")
+
+	type FallbackConfig struct {
+		Value string `hcl:"value,optional" default:"${FALLBACK_VAR}"`
+	}
+
+	var fallbackConfig FallbackConfig
+	err = UnmarshalBlock(&Block{Name: "test", Body: []Entry{}}, &fallbackConfig,
+		WithVariableExpansion(map[string]string{}))
+	assert.NoError(t, err)
+	assert.Equal(t, "fallback-value", fallbackConfig.Value)
+}
