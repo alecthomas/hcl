@@ -594,7 +594,25 @@ func flattenFields(v reflect.Value, opt *marshalState) ([]field, error) {
 			out = append(out, sub...)
 		} else {
 			tag := parseTag(v.Type(), ft, opt) // nolint: govet
-			out = append(out, field{ft, f, tag})
+			if tag.embed {
+				fv := f
+				if fv.Kind() == reflect.Ptr {
+					if fv.IsNil() {
+						fv.Set(reflect.New(fv.Type().Elem()))
+					}
+					fv = fv.Elem()
+				}
+				if fv.Kind() != reflect.Struct {
+					return nil, fmt.Errorf("%s: embed field must be a struct", ft.Name)
+				}
+				sub, err := flattenFields(fv, opt)
+				if err != nil {
+					return nil, fmt.Errorf("%s: %s", ft.Name, err)
+				}
+				out = append(out, sub...)
+			} else {
+				out = append(out, field{ft, f, tag})
+			}
 		}
 	}
 	return out, nil
@@ -609,6 +627,7 @@ type tag struct {
 	optional     bool
 	label        bool
 	block        bool
+	embed        bool
 	remain       bool
 	help         string
 	defaultValue string
@@ -668,6 +687,8 @@ func parseTag(parent reflect.Type, t reflect.StructField, opt *marshalState) tag
 		return tag{name: name, label: true, help: help}
 	case "block":
 		return tag{name: name, block: true, optional: true, help: help}
+	case "embed":
+		return tag{name: name, embed: true, help: help}
 	case "remain":
 		return tag{name: name, remain: true, help: help}
 	default:

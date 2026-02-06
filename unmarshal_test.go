@@ -454,6 +454,32 @@ message2 = "world"
 			}{
 				Octal: 0700,
 			}},
+		{name: "EmbedTag",
+			hcl: `
+				str = "hello"
+				bar = "world"
+			`,
+			dest: struct {
+				Inner strBlock `hcl:",embed"`
+				Bar   string   `hcl:"bar"`
+			}{
+				Inner: strBlock{Str: "hello"},
+				Bar:   "world",
+			},
+		},
+		{name: "EmbedTagPointer",
+			hcl: `
+				str = "hello"
+				bar = "world"
+			`,
+			dest: struct {
+				Inner *strBlock `hcl:",embed"`
+				Bar   string    `hcl:"bar"`
+			}{
+				Inner: &strBlock{Str: "hello"},
+				Bar:   "world",
+			},
+		},
 	}
 	runTests(t, tests)
 }

@@ -361,6 +361,40 @@ attr = "string"
 			`,
 			options: []MarshalOption{WithSchemaComments(true)},
 		},
+		{name: "EmbedTag",
+			src: &struct {
+				Inner struct {
+					Str string `hcl:"str"`
+				} `hcl:",embed"`
+				Bar string `hcl:"bar"`
+			}{
+				Inner: struct {
+					Str string `hcl:"str"`
+				}{Str: "hello"},
+				Bar: "world",
+			},
+			expected: `
+str = "hello"
+bar = "world"
+`,
+		},
+		{name: "EmbedTagPointer",
+			src: &struct {
+				Inner *struct {
+					Str string `hcl:"str"`
+				} `hcl:",embed"`
+				Bar string `hcl:"bar"`
+			}{
+				Inner: &struct {
+					Str string `hcl:"str"`
+				}{Str: "hello"},
+				Bar: "world",
+			},
+			expected: `
+str = "hello"
+bar = "world"
+`,
+		},
 		{name: "DontMarshalOmittedBlock",
 			src: &struct {
 				HTML *struct {
