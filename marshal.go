@@ -26,6 +26,7 @@ type marshalState struct {
 	schemaComments       bool
 	seenStructs          map[reflect.Type]bool
 	allowExtra           bool
+	implicitBlocks       bool
 	defaultTransformer   func(string) string
 }
 
@@ -82,6 +83,15 @@ func AllowExtra(ok bool) MarshalOption {
 func WithSchemaComments(v bool) MarshalOption {
 	return func(options *marshalState) {
 		options.schemaComments = v
+	}
+}
+
+// HydratedImplicitBlocks will treat single (non-repeated) blocks as always
+// present during unmarshalling, even if absent from the config. This causes
+// defaults within those blocks to be applied and required fields to be enforced.
+func HydratedImplicitBlocks(v bool) MarshalOption {
+	return func(options *marshalState) {
+		options.implicitBlocks = v
 	}
 }
 

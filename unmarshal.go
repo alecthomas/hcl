@@ -128,6 +128,21 @@ func unmarshalEntries(v reflect.Value, entries []Entry, opt *marshalState) error
 			if !tag.optional && haventSeen {
 				return fmt.Errorf("missing required attribute %q", tag.name)
 			}
+			// For single (non-repeated) blocks, hydrate the struct with
+			// defaults even when the block is absent from the config.
+			if opt.implicitBlocks && tag.block {
+				fv := field.v
+				if fv.Kind() == reflect.Ptr {
+					fv.Set(reflect.New(fv.Type().Elem()))
+					fv = fv.Elem()
+				}
+				if fv.Kind() == reflect.Struct {
+					if err := unmarshalEntries(fv, nil, opt); err != nil {
+						return fmt.Errorf("failed to hydrate implicit block %q: %w", tag.name, err)
+					}
+					continue
+				}
+			}
 			// apply defaults here as there's no value for this field
 			v, err := defaultValueFromTag(field, tag.defaultValue, opt)
 			if err != nil {

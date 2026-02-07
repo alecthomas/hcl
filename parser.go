@@ -95,6 +95,8 @@ func (a *AST) Clone() *AST {
 
 func (a *AST) Position() Position { return a.Pos }
 
+func (a *AST) Children() Entries { return a.Entries }
+
 func (a *AST) children() (children []Node) {
 	for _, entry := range a.Entries {
 		children = append(children, entry)
@@ -216,6 +218,8 @@ func (b *Block) EntryKey() string { return b.Name }
 func (b *Block) Detach() bool {
 	return detachEntry(b.Parent, b)
 }
+
+func (b *Block) Children() Entries { return b.Body }
 
 func (b *Block) children() (children []Node) {
 	for _, entry := range b.Body {

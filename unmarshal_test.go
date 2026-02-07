@@ -484,6 +484,97 @@ message2 = "world"
 	runTests(t, tests)
 }
 
+func TestHydratedImplicitBlocks(t *testing.T) {
+	type inner struct {
+		Name    string `hcl:"name" default:"default-name"`
+		Count   int    `hcl:"count" default:"42"`
+		Enabled bool   `hcl:"enabled" default:"true"`
+	}
+	type nested struct {
+		Deep string `hcl:"deep" default:"deep-value"`
+	}
+	type innerWithNested struct {
+		Value  string `hcl:"value" default:"hello"`
+		Nested nested `hcl:"nested,block"`
+	}
+
+	tests := []test{
+		{
+			name: "DefaultsAppliedToAbsentBlock",
+			hcl:  ``,
+			dest: struct {
+				Block inner `hcl:"block,block"`
+			}{
+				Block: inner{Name: "default-name", Count: 42, Enabled: true},
+			},
+			options: []MarshalOption{HydratedImplicitBlocks(true)},
+		},
+		{
+			name: "ExplicitBlockStillWorks",
+			hcl:  `block { name = "explicit" }`,
+			dest: struct {
+				Block inner `hcl:"block,block"`
+			}{
+				Block: inner{Name: "explicit", Count: 42, Enabled: true},
+			},
+			options: []MarshalOption{HydratedImplicitBlocks(true)},
+		},
+		{
+			name: "PointerBlockHydrated",
+			hcl:  ``,
+			dest: struct {
+				Block *inner `hcl:"block,block"`
+			}{
+				Block: &inner{Name: "default-name", Count: 42, Enabled: true},
+			},
+			options: []MarshalOption{HydratedImplicitBlocks(true)},
+		},
+		{
+			name: "SliceBlockNotHydrated",
+			hcl:  ``,
+			dest: struct {
+				Blocks []inner `hcl:"block,block"`
+			}{},
+			options: []MarshalOption{HydratedImplicitBlocks(true)},
+		},
+		{
+			name: "NestedBlocksHydrated",
+			hcl:  ``,
+			dest: struct {
+				Block innerWithNested `hcl:"block,block"`
+			}{
+				Block: innerWithNested{
+					Value:  "hello",
+					Nested: nested{Deep: "deep-value"},
+				},
+			},
+			options: []MarshalOption{HydratedImplicitBlocks(true)},
+		},
+		{
+			name: "RequiredFieldInAbsentBlock",
+			hcl:  ``,
+			dest: struct {
+				Block struct {
+					Required string `hcl:"required"`
+				} `hcl:"block,block"`
+			}{},
+			fail:    `failed to hydrate implicit block "block": missing required attribute "required"`,
+			options: []MarshalOption{HydratedImplicitBlocks(true)},
+		},
+		{
+			name: "DisabledByDefault",
+			hcl:  ``,
+			dest: struct {
+				Block inner `hcl:"block,block"`
+			}{
+				Block: inner{},
+			},
+		},
+	}
+
+	runTests(t, tests)
+}
+
 type remainStruct struct {
 	Name   string          `hcl:"name"`
 	Nested []*remainNested `hcl:"nested,optional"`
